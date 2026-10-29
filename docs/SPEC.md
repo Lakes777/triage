@@ -241,6 +241,17 @@ Depois da última fase: currículo, portfólio, perfil e guia (`/atualizar-os-qu
   SMART, então lá esses itens saem `nao_se_aplica`/`pulado`.
 - **Defender e SmartScreen:** um `.exe` sem assinatura que apaga arquivos pode ser bloqueado. Descobrir na
   fase 1 (primeiro `.exe`) e documentar no README.
+  > 29/10/2026: **CONFIRMADO, e pior que o SmartScreen.** O Controle Inteligente de Aplicativos (Smart App Control,
+  > ligado no notebook dele) passou a bloquear o `.exe` da fase 2 sem botão "executar assim mesmo" (Code Integrity
+  > 3077/3033). Decide pela reputação de cada arquivo novo sem assinatura na nuvem, então libera um build e bloqueia
+  > o seguinte. Vem ligado em instalações novas do Windows 11: atinge o uso real na família (P1). Decisão dele
+  > (muda a P14): **assinar pela SignPath Foundation** (grátis para código aberto) e, até lá, testar pelo CI e pelas
+  > leituras gravadas. Feito: licença MIT (58e09c2), seções de privacidade e download no README. Falta: (1) uma
+  > release no GitHub (a SignPath só assina o que já foi publicado; precisa da autorização dele); (2) ele pedir em
+  > signpath.org/apply com a conta dele, 2FA ligado no GitHub; (3) depois de aceito: seção "Code signing policy" no
+  > README (crédito SignPath.io + SignPath Foundation, papéis do time, link da privacidade), nome e versão do produto
+  > no artefato, aprovação manual a cada release, assinatura no CI. Plano B na fase 10, se recusarem: certificado de
+  > código aberto da Certum (pago, quebra o custo zero; decisão dele).
 - **Correção apagar algo real:** testes só em pasta falsa; lista de pastas fechada; primeiro uso real só nos
   temporários.
 - **Vazar a frota real no painel público:** regra da P31 com contraprova na fase 9.
