@@ -38,9 +38,21 @@ jobs:
           $saida
           & .\publicado\triage.exe comando-que-nao-existe 2>$null
           if ($LASTEXITCODE -ne 2) { throw "comando desconhecido deveria sair com 2, saiu com $LASTEXITCODE" }
+          # A revisão de verdade num Windows (o runner é administrador: lê também o desgaste e C:\Windows\Temp)
+          & .\publicado\triage.exe revisar
+          if ($LASTEXITCODE -ne 0) { throw "triage revisar saiu com $LASTEXITCODE" }
+          & .\publicado\triage.exe gravar leitura-ci.json
+          if ($LASTEXITCODE -ne 0) { throw "triage gravar saiu com $LASTEXITCODE" }
+          Get-Content leitura-ci.json
+          # Prova do caminho com admin: o runner é administrador, então estas partes têm que ter sido lidas
+          $j = Get-Content leitura-ci.json | ConvertFrom-Json
+          if (-not $j.administrador) { throw "o runner deveria ser administrador" }
+          foreach ($parte in "volumes", "discos", "tempDoWindows", "cacheDoWindowsUpdate", "ultimaInicializacao") {
+            if ($j.$parte.pulo) { throw "$parte ficou sem leitura mesmo com admin: $($j.$parte.pulo)" }
+          }
           (Get-FileHash .\publicado\triage.exe -Algorithm SHA256).Hash.ToLower() + "  triage.exe" | Out-File -Encoding ascii publicado\triage.exe.sha256
           Get-Content publicado\triage.exe.sha256
-          # O GitHub encerra o passo com o último $LASTEXITCODE, que ainda é o 2 de propósito lá de cima
+          # O GitHub encerra o passo com o último $LASTEXITCODE: sem isto, tirar o gravar daria o 2 de propósito lá de cima
           exit 0
       - uses: actions/upload-artifact@v5
         with:

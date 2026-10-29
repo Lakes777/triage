@@ -203,6 +203,24 @@ README atualizado. Uma sessão nova por fase, começando por este arquivo.
 > - **Para a fase 2 (P11, "roda no clique"):** hoje, sem argumento, o agente mostra a ajuda e a janela do duplo clique
 >   fecha na hora. Na fase 2, sem argumento = `revisar` e esperar Enter antes de fechar.
 
+> 29/10/2026 (fase 2, decidido ao fazer):
+> - **A leitura é uma foto só** (`FotoDoSistema`, lida de uma vez por `ILeitorDoSistema.Ler()`), com cada parte num
+>   `Lido<T>` (valor ou motivo do pulo). Vira JSON no `triage gravar` e nos testes (`tests/dados/`). Comando novo:
+>   `triage revisar --leitura <arq>` revisa uma gravação, o que permite rodar o agente inteiro no WSL.
+> - `Avaliacao` recusa pulado sem motivo e motivo sem pulado; o motor transforma exceção numa verificação em pulado
+>   (`Erro`) sem derrubar as outras. Contraprovas feitas: bateria sem leitura, verificação com defeito e disco sem
+>   saúde viram "ok" e os testes quebram.
+> - **Sem admin, medido no notebook (29/10):** desgaste do SSD (`MSFT_StorageReliabilityCounter`) e
+>   `C:\Windows\Temp` ficam de fora e aparecem no resumo; a capacidade original da bateria não sai por WMI
+>   (`BatteryStaticData`) e vem do `powercfg /batteryreport /xml`, que funciona para qualquer usuário.
+>   O CI (runner administrador) confere que volumes, discos, `C:\Windows\Temp`, cache e reinício foram lidos; o
+>   desgaste real e o casamento de `DeviceId` entre os dois WMIs só se provam rodando como admin num PC de verdade.
+> - O item segue "ok" quando lê a parte principal e só um detalhe ficou de fora (disco sem o desgaste, temporários
+>   sem a pasta do Windows): o detalhe vai no resumo. Só vira pulado quando não sobra nada para avaliar.
+> - Último reinício pelo `LastBootUpTime` (a inicialização rápida faz "Desligar" não contar, e isso é dito ao usuário).
+> - Sem argumento = revisar e esperar Enter (duplo clique, P11). `limites.json` com erro para a revisão com aviso.
+> - Revisão leva ~4 s no notebook. Números finais dos limites: ver `Limites.cs` (fonte em cada um).
+
 Boas para subagentes (em worktree):
 
 - **Fases 2 e 3:** cada verificação é uma classe sem dependência das outras, lendo só pela

@@ -18,4 +18,8 @@
     <ProjectReference Include="..\..\src\Triage.Agente\Triage.Agente.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\dados\*.json" Link="dados\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

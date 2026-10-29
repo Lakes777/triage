@@ -1,0 +1,79 @@
+{
+  "lidaEm": "2026-10-29T11:50:24.95225-03:00",
+  "administrador": false,
+  "volumes": {
+    "valor": [
+      {
+        "letra": "C:",
+        "total": 239150821376,
+        "livre": 129162145792,
+        "doSistema": true
+      },
+      {
+        "letra": "D:",
+        "total": 120031539200,
+        "livre": 98336706560,
+        "doSistema": false
+      }
+    ],
+    "pulo": null
+  },
+  "discos": {
+    "valor": [
+      {
+        "modelo": "SAMSUNG MZVLQ256HBJD-00B",
+        "tipo": "nvme",
+        "tamanho": 256060514304,
+        "saude": "saudavel",
+        "desgaste": null,
+        "desgasteNaoLido": "semAdmin"
+      },
+      {
+        "modelo": "HP SSD S700 120GB",
+        "tipo": "ssd",
+        "tamanho": 120034123776,
+        "saude": "saudavel",
+        "desgaste": null,
+        "desgasteNaoLido": "semAdmin"
+      }
+    ],
+    "pulo": null
+  },
+  "tempDoUsuario": {
+    "valor": {
+      "bytes": 577705733,
+      "arquivos": 91
+    },
+    "pulo": null
+  },
+  "tempDoWindows": {
+    "valor": null,
+    "pulo": "semAdmin"
+  },
+  "cacheDoWindowsUpdate": {
+    "valor": {
+      "bytes": 6077000,
+      "arquivos": 4
+    },
+    "pulo": null
+  },
+  "lixeira": {
+    "valor": {
+      "bytes": 233650989,
+      "itens": 14
+    },
+    "pulo": null
+  },
+  "ultimaInicializacao": {
+    "valor": "2026-10-27T18:46:31.264167-03:00",
+    "pulo": null
+  },
+  "bateria": {
+    "valor": {
+      "capacidadeDeProjeto": 43092,
+      "capacidadeAtual": 38065,
+      "ciclos": 22
+    },
+    "pulo": null
+  }
+}
