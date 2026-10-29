@@ -24,6 +24,8 @@ public static class ErroDoWindowsUpdate
             // Confiança de certificado (0x800B0xxx): um firewall que abre o HTTPS no meio do caminho. Medido em
             // 29/10/2026 na rede da PUC (Fortinet): a busca falha com 0x800B0109 (raiz não confiável)
             _ when (codigo & 0xFFFFF000) == 0x800B0000 => MotivoDoPulo.SemConexao,
+            // WU_E_PT_ENDPOINT_UNREACHABLE: sem rota até o servidor, fora da faixa 0x80244xxx
+            0x80240438 => MotivoDoPulo.SemConexao,
             _ when erro is TimeoutException => MotivoDoPulo.SemConexao,
             // E_ACCESSDENIED
             0x80070005 => semPermissao,

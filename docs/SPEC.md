@@ -221,6 +221,29 @@ README atualizado. Uma sessão nova por fase, começando por este arquivo.
 > - Sem argumento = revisar e esperar Enter (duplo clique, P11). `limites.json` com erro para a revisão com aviso.
 > - Revisão leva ~4 s no notebook. Números finais dos limites: ver `Limites.cs` (fonte em cada um).
 
+> 29/10/2026 (fase 3, decidido ao fazer):
+> - **Feita por 2 subagentes em worktree** depois de um contrato commitado (a52eb1b: campos `init` novos na foto, que
+>   saem pulados em leituras gravadas antes; limites; esqueletos). Grupo rede (d62766e) e grupo locais (a1a8ec1)
+>   juntados sem conflito. Os dois não conseguiram rodar `powershell.exe` de dentro do worktree.
+> - **Rodou no notebook** (o Controle Inteligente liberou este build): 15 itens em ~21 s, 2 em atenção (reinício
+>   pendente pelo `CBS\RebootPending`; 12 programas no winget). As duas leituras de rede rodam em paralelo com o resto.
+> - **Windows Update:** sem a busca online, um problema já visto offline (reinício pendente, dias sem instalar) dá a
+>   gravidade; offline bom = pulado com o motivo da busca, nunca "ok". HRESULT de rede/proxy/certificado e 0x80240438 =
+>   `SemConexao` (o Fortinet da PUC dá 0x800B0109). O histórico ignora definições do antivírus, KB890830 e KB4052623.
+> - **winget** pelo caminho completo do alias; a tabela é lida pela posição das colunas (o cabeçalho é traduzido).
+>   Cabeçalho sem nenhuma linha legível = pulado (`Erro`), nunca "nada desatualizado".
+> - **Privacidade (revisor):** dispositivo com erro só com classe e código (o nome pode ser "iPhone de André");
+>   atalho da pasta Inicializar entra como "atalho na pasta Inicializar" (é nome de arquivo); do registro fica o nome
+>   que o programa registrou. Desligamento inesperado não conta o Kernel-Power 41 que vem com `BugcheckCode` (esse é
+>   tela azul). Código 22 (desativado) e 45 (desconectado) não são driver com erro.
+> - **Pendente:** (1) os valores `01` e `05` do `StartupApproved` no notebook (Docker, Discord, Spotify, Chrome = 01;
+>   SecurityHealth = 05) caem em "ímpar = desligado"; nenhuma fonte explica, conferir com o Gerenciador de Tarefas dele;
+>   (2) firewall lê a configuração local, não a efetiva (política de grupo): usar `HNetCfg.FwPolicy2` ou `ActiveStore`;
+>   (3) serviço do Windows Update desativado (0x80070422) sai "pulado: erro", mas é o problema a mostrar (atenção);
+>   (4) as regras de pulo do antivírus e do firewall estão no leitor do Windows, sem teste: levar para função pura;
+>   (5) fase 4: o trimming desliga o `BuiltInComInteropSupport` e quebraria o COM do Windows Update;
+>   (6) o CI ainda não exige o histórico do Windows Update (pode estar desligado na imagem); exigir depois de ver.
+
 Boas para subagentes (em worktree):
 
 - **Fases 2 e 3:** cada verificação é uma classe sem dependência das outras, lendo só pela

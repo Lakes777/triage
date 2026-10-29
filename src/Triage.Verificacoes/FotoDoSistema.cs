@@ -74,13 +74,19 @@ public sealed record AtualizacoesPendentes(int Pendentes, int DeSeguranca);
 /// <summary>Nome e versões como o winget mostra (P15 permite nome/versão de programa desatualizado).</summary>
 public sealed record ProgramaDesatualizado(string Nome, string Id, string Versao, string Disponivel);
 
-/// <summary>Nome do programa (valor do registro ou atalho sem ".lnk"), nunca o comando ou o caminho.</summary>
+/// <summary>
+/// Nome do programa como ele mesmo se registrou (valor do registro), nunca o comando ou o caminho. Atalho da pasta
+/// Inicializar não leva o nome: é nome de arquivo, e pode ser um documento do usuário (P15).
+/// </summary>
 public sealed record ProgramaNaInicializacao(string Nome, OrigemDaInicializacao Origem);
 
 public enum OrigemDaInicializacao { RegistroDoUsuario, RegistroDoSistema, PastaDoUsuario, PastaDoSistema }
 
-/// <summary>Dispositivo com erro no Gerenciador de Dispositivos (código do ConfigManagerErrorCode).</summary>
-public sealed record DispositivoComErro(string Nome, string Classe, int Codigo);
+/// <summary>
+/// Dispositivo com erro no Gerenciador de Dispositivos (código do ConfigManagerErrorCode). Sem o nome: aparelho
+/// pareado tem nome dado pelo dono ("iPhone de André"), e a P15 não deixa nome de pessoa entrar na foto.
+/// </summary>
+public sealed record DispositivoComErro(string Classe, int Codigo);
 
 /// <summary>Contagens no log do Sistema nos últimos <see cref="Dias"/> dias.</summary>
 public sealed record EventosDoSistema(int Dias, int DesligamentosInesperados, int TelasAzuis);

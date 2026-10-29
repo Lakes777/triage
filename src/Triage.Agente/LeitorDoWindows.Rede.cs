@@ -20,6 +20,9 @@ public sealed partial class LeitorDoWindows
     private const string CategoriaSeguranca = "0fa1201d-4330-4fa8-8ae9-b877473b6441";
     // Mesmo pacote no histórico quando a entrada vem sem categoria
     private const string KbDasDefinicoes = "KB2267602";
+    // Ferramenta de remoção de malware e plataforma do Defender: instalam todo mês mesmo com a atualização cumulativa
+    // falhando, e esconderiam um Windows parado há meses
+    private static readonly string[] KbsQueNaoContam = [KbDasDefinicoes, "KB890830", "KB4052623"];
 
     private static readonly TimeSpan PrazoDaBusca = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan PrazoDoHistorico = TimeSpan.FromSeconds(30);
@@ -63,7 +66,7 @@ public sealed partial class LeitorDoWindows
                     continue;
                 HashSet<string> categorias = Categorias(entrada.Categories);
                 string titulo = Convert.ToString((object)entrada.Title) ?? "";
-                if (categorias.Contains(CategoriaDefinicoes) || titulo.Contains(KbDasDefinicoes, StringComparison.OrdinalIgnoreCase))
+                if (categorias.Contains(CategoriaDefinicoes) || KbsQueNaoContam.Any(kb => titulo.Contains(kb, StringComparison.OrdinalIgnoreCase)))
                     continue;
                 // A data vem em UTC, sem dizer
                 var data = new DateTimeOffset(DateTime.SpecifyKind((DateTime)entrada.Date, DateTimeKind.Utc));

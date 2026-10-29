@@ -134,4 +134,18 @@ public class SaidaDoWingetTests
 
         Assert.Single(SaidaDoWinget.LerTabelas(saida)!);
     }
+
+    [Fact]
+    public void Tabela_sem_nenhuma_linha_legivel_e_erro_e_nao_tudo_atualizado()
+    {
+        // Nome com caracteres largos: o winget alinha pela largura na tela, e a linha não cabe nas colunas
+        const string saida = "Nome      ID         Versão  Disponível Origem\n"
+            + "-----------------------------------------------\n"
+            + "微信微信 Tencent.WeChat 3.9.0 3.9.1 winget\n";
+
+        var lido = SaidaDoWinget.Interpretar(saida, 0);
+
+        Assert.False(lido.FoiLido);
+        Assert.Equal(MotivoDoPulo.Erro, lido.Pulo);
+    }
 }

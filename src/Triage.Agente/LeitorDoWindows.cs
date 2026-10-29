@@ -21,7 +21,11 @@ public sealed partial class LeitorDoWindows(TimeProvider relogio) : ILeitorDoSis
     {
         var admin = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-        return new FotoDoSistema(
+        // As duas leituras de rede esperam até 90 s e 120 s: correm em paralelo com todo o resto, e o pior caso cai
+        // de ~4 min para ~2 min
+        var atualizacoes = Task.Run(() => LerAtualizacoesPendentes(admin));
+        var programas = Task.Run(() => LerProgramasDesatualizados(admin));
+        var foto = new FotoDoSistema(
             relogio.GetLocalNow(),
             admin,
             Tentar(admin, LerVolumes),
@@ -34,16 +38,16 @@ public sealed partial class LeitorDoWindows(TimeProvider relogio) : ILeitorDoSis
             Tentar(admin, LerBateria))
         {
             // Fase 3: rede em LeitorDoWindows.Rede.cs, o resto em LeitorDoWindows.Locais.cs
-            Atualizacoes = LerAtualizacoesPendentes(admin),
             ReinicioPendente = LerReinicioPendente(admin),
             UltimaAtualizacaoInstalada = LerUltimaAtualizacaoInstalada(admin),
-            ProgramasDesatualizados = LerProgramasDesatualizados(admin),
             Inicializacao = LerInicializacao(admin),
             DriversComErro = LerDriversComErro(admin),
             Eventos = LerEventos(admin, relogio),
             Antivirus = LerAntivirus(admin),
             Firewall = LerFirewall(admin),
         };
+        // Cada leitura já tem o próprio prazo e devolve pulado em vez de lançar
+        return foto with { Atualizacoes = atualizacoes.Result, ProgramasDesatualizados = programas.Result };
     }
 
     private static Lido<T> Tentar<T>(bool admin, Func<T> ler)

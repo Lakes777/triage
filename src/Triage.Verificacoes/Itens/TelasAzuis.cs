@@ -15,6 +15,6 @@ public sealed class TelasAzuis : IVerificacao
         var eventos = foto.Eventos.Valor!;
         return new Avaliacao(
             Resumos.PelaContagem(eventos.TelasAzuis, limites.TelasAzuisAtencao, limites.TelasAzuisCritico),
-            Resumos.Eventos(eventos.TelasAzuis, eventos.Dias));
+            Resumos.Eventos(eventos.TelasAzuis, eventos.Dias, feminino: true));
     }
 }

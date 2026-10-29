@@ -16,6 +16,6 @@ public sealed class DriversComErro : IVerificacao
         if (dispositivos.Count == 0)
             return new Avaliacao(Gravidade.Ok, "nenhum aparelho com erro");
         return new Avaliacao(Gravidade.Atencao,
-            Resumos.Alguns(dispositivos.Select(d => $"{d.Nome} (código {d.Codigo})").ToList()));
+            Resumos.Alguns(dispositivos.Select(d => $"{d.Classe} (código {d.Codigo})").ToList()));
     }
 }

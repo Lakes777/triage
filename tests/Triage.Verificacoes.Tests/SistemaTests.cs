@@ -72,17 +72,17 @@ public class SistemaTests
     }
 
     [Fact]
-    public void Driver_com_erro_e_atencao_com_nome_e_codigo()
+    public void Driver_com_erro_e_atencao_com_classe_e_codigo_sem_o_nome()
     {
         var foto = Saudavel() with
         {
-            DriversComErro = Lido.Ok<IReadOnlyList<DispositivoComErro>>([new DispositivoComErro("Câmera integrada", "Camera", 28)]),
+            DriversComErro = Lido.Ok<IReadOnlyList<DispositivoComErro>>([new DispositivoComErro("Camera", 28)]),
         };
 
         var avaliacao = new DriversComErro().Avaliar(foto, Limites.Padrao);
 
         Assert.Equal(Gravidade.Atencao, avaliacao.Gravidade);
-        Assert.Equal("Câmera integrada (código 28)", avaliacao.Resumo);
+        Assert.Equal("Camera (código 28)", avaliacao.Resumo);
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public class SistemaTests
         var foto = Saudavel() with { Eventos = Lido.Ok(new EventosDoSistema(30, 4, 0)) };
 
         Assert.Equal("4 nos últimos 30 dias", new DesligamentosInesperados().Avaliar(foto, Limites.Padrao).Resumo);
-        Assert.Equal("nenhum nos últimos 30 dias", new TelasAzuis().Avaliar(foto, Limites.Padrao).Resumo);
+        Assert.Equal("nenhuma nos últimos 30 dias", new TelasAzuis().Avaliar(foto, Limites.Padrao).Resumo);
         Assert.Equal(Gravidade.Ok, new TelasAzuis().Avaliar(foto, Limites.Padrao).Gravidade);
     }
 

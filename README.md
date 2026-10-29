@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/Lakes777/triage/actions/workflows/ci.yml/badge.svg)](https://github.com/Lakes777/triage/actions/workflows/ci.yml)
 
-> Em construção: fase 2 de 10 (as primeiras 7 verificações). O plano inteiro está em [docs/SPEC.md](docs/SPEC.md).
+> Em construção: fase 3 de 10 (15 verificações). O plano inteiro está em [docs/SPEC.md](docs/SPEC.md).
 
 Um agente que roda no computador, confere o que costuma dar problema (disco gastando, espaço acabando,
 bateria cansada, atualizações paradas, telas azuis, Defender desligado...) e gera um relatório com o que é,
@@ -38,7 +38,9 @@ frota num painel e avisa no Telegram quando algo piora.
 ## O que ele confere (até agora)
 
 Saúde dos discos (e o desgaste dos SSDs, com admin) · espaço livre · arquivos temporários · cache do Windows
-Update · lixeira · tempo sem reiniciar · saúde da bateria (só em notebook). Cada item sai como **ok**,
+Update · lixeira · tempo sem reiniciar · saúde da bateria (só em notebook) · atualizações do Windows ·
+programas desatualizados (`winget`) · programas na inicialização · drivers com erro · desligamentos
+inesperados · telas azuis · antivírus · firewall. Cada item sai como **ok**,
 **atenção**, **crítico**, **pulado** (com o motivo: sem admin, sem conexão...) ou **não se aplica**, e os
 limites podem ser trocados num `limites.json` em `%LOCALAPPDATA%\Triage`.
 
@@ -79,7 +81,9 @@ O CI publica o `.exe` num Windows, roda e guarda o arquivo com o SHA-256 em cada
 
 ## Privacidade
 
-O Triage não manda nada para lugar nenhum por conta própria. Tudo roda no PC, sem internet. O envio ao
+O Triage não manda nada para lugar nenhum por conta própria. Ele só usa a internet para perguntar à Microsoft se há
+atualizações (Windows Update e `winget`), sem enviar dados seus; sem internet, esses dois itens saem como
+"pulado: sem conexão" e todo o resto funciona. O envio ao
 servidor só acontece se você inscrever a máquina com um código (`triage inscrever`, fase 7), e mesmo assim só
 vão medidas e nome/versão de programas desatualizados: nunca nome de arquivo, de usuário ou de pasta.
 Nenhuma correção acontece sem você confirmar.

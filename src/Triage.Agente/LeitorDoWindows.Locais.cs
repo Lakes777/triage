@@ -49,6 +49,8 @@ public sealed partial class LeitorDoWindows
             .ToList();
     }
 
+    private const string NomeDeAtalho = "atalho na pasta Inicializar";
+
     private static List<ProgramaNaInicializacao> DaPasta(Environment.SpecialFolder especial, RegistryKey raiz,
         OrigemDaInicializacao origem)
     {
@@ -62,7 +64,8 @@ public sealed partial class LeitorDoWindows
             .OfType<string>()
             .Where(arquivo => !arquivo.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase)
                 && CodigosDoWindows.InicializacaoLigada(aprovacoes?.GetValue(arquivo) as byte[]))
-            .Select(arquivo => new ProgramaNaInicializacao(CodigosDoWindows.SemCaminho(Path.GetFileNameWithoutExtension(arquivo)), origem))
+            // O nome do atalho é nome de arquivo (pode ser "Planilha do André"): fica só a contagem (P15)
+            .Select(_ => new ProgramaNaInicializacao(NomeDeAtalho, origem))
             .ToList();
     }
 
@@ -70,7 +73,7 @@ public sealed partial class LeitorDoWindows
         Tentar<IReadOnlyList<DispositivoComErro>>(admin, () =>
         {
             using var busca = new ManagementObjectSearcher(
-                "SELECT Name, PNPClass, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE ConfigManagerErrorCode <> 0");
+                "SELECT PNPClass, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE ConfigManagerErrorCode <> 0");
             using var dispositivos = busca.Get();
             var comErro = new List<DispositivoComErro>();
             foreach (var d in dispositivos.Cast<ManagementObject>())
@@ -78,8 +81,8 @@ public sealed partial class LeitorDoWindows
                 // Convert.ToInt32(null) daria 0: o nulo é tratado antes de converter
                 if (d["ConfigManagerErrorCode"] is { } bruto && Convert.ToInt32(bruto) is var codigo
                     && CodigosDoWindows.DriverComErro(codigo))
-                    comErro.Add(new DispositivoComErro(
-                        Texto(d["Name"], "dispositivo sem nome"), Texto(d["PNPClass"], "sem classe"), codigo));
+                    // Sem o Name: aparelho pareado tem o nome que o dono deu (P15)
+                    comErro.Add(new DispositivoComErro(Texto(d["PNPClass"], "sem classe"), codigo));
             }
             return comErro;
         });
@@ -92,17 +95,19 @@ public sealed partial class LeitorDoWindows
     {
         var desde = relogio.GetUtcNow().AddDays(-DiasDeEventos);
         return new EventosDoSistema(DiasDeEventos,
-            // Kernel-Power 41: o Windows voltou sem ter desligado direito (energia, botão segurado, travamento)
-            ContarEventos("Microsoft-Windows-Kernel-Power", 41, desde),
+            // Kernel-Power 41: o Windows voltou sem ter desligado direito (energia, botão segurado, travamento). Depois de
+            // uma tela azul ele também grava o 41, com o BugcheckCode: esses ficam só nas telas azuis
+            ContarEventos("Microsoft-Windows-Kernel-Power", 41, desde, "EventData[Data[@Name='BugcheckCode']='0']"),
             // BugCheck 1001: o Windows reiniciou depois de uma tela azul
             ContarEventos("Microsoft-Windows-WER-SystemErrorReporting", 1001, desde));
     });
 
-    private static int ContarEventos(string provedor, int id, DateTimeOffset desde)
+    private static int ContarEventos(string provedor, int id, DateTimeOffset desde, string? alemDisso = null)
     {
         // Data fixa pelo relógio (não "últimos N ms" do próprio Windows), para a janela bater com a hora da foto
         var inicio = desde.UtcDateTime.ToString("yyyy-MM-dd'T'HH':'mm':'ss'.'fff'Z'", CultureInfo.InvariantCulture);
-        var filtro = $"*[System[Provider[@Name='{provedor}'] and (EventID={id}) and TimeCreated[@SystemTime>='{inicio}']]]";
+        var filtro = $"*[System[Provider[@Name='{provedor}'] and (EventID={id}) and TimeCreated[@SystemTime>='{inicio}']]]"
+            + (alemDisso is null ? "" : $" and *[{alemDisso}]");
         using var leitor = new EventLogReader(new EventLogQuery("System", PathType.LogName, filtro));
         var total = 0;
         for (var evento = leitor.ReadEvent(); evento is not null; evento = leitor.ReadEvent())

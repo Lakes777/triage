@@ -9,9 +9,9 @@ internal static class Resumos
 
     public static string Dias(int dias) => dias == 1 ? "1 dia" : $"{dias} dias";
 
-    /// <summary>Contagem de eventos do log do Sistema: "nenhum", "1" ou "N" nos últimos dias.</summary>
-    public static string Eventos(int quantos, int dias) =>
-        $"{(quantos == 0 ? "nenhum" : Textos.Numero(quantos))} nos últimos {Dias(dias)}";
+    /// <summary>Contagem de eventos do log do Sistema: "nenhum"/"nenhuma", "1" ou "N" nos últimos dias.</summary>
+    public static string Eventos(int quantos, int dias, bool feminino = false) =>
+        $"{(quantos == 0 ? (feminino ? "nenhuma" : "nenhum") : Textos.Numero(quantos))} nos últimos {Dias(dias)}";
 
     public static Gravidade PelaContagem(int quantos, int atencao, int critico) =>
         quantos >= critico ? Gravidade.Critico

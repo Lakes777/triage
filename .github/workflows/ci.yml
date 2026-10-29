@@ -47,7 +47,10 @@ jobs:
           # Prova do caminho com admin: o runner é administrador, então estas partes têm que ter sido lidas
           $j = Get-Content leitura-ci.json | ConvertFrom-Json
           if (-not $j.administrador) { throw "o runner deveria ser administrador" }
-          foreach ($parte in "volumes", "discos", "tempDoWindows", "cacheDoWindowsUpdate", "ultimaInicializacao") {
+          # Rede (Windows Update online, winget), histórico do Windows Update (o serviço pode estar desligado na imagem) e
+          # antivírus (o Server pode não ter Defender) só aparecem no log por enquanto
+          foreach ($parte in "volumes", "discos", "tempDoWindows", "cacheDoWindowsUpdate", "ultimaInicializacao",
+                   "reinicioPendente", "inicializacao", "driversComErro", "eventos", "firewall") {
             if ($j.$parte.pulo) { throw "$parte ficou sem leitura mesmo com admin: $($j.$parte.pulo)" }
           }
           (Get-FileHash .\publicado\triage.exe -Algorithm SHA256).Hash.ToLower() + "  triage.exe" | Out-File -Encoding ascii publicado\triage.exe.sha256

@@ -19,7 +19,9 @@ public static partial class SaidaDoWinget
     public static Lido<IReadOnlyList<ProgramaDesatualizado>> Interpretar(string saida, int codigoDeSaida)
     {
         if (LerTabelas(saida) is { } programas)
-            return Lido.Ok(programas);
+            // Cabeçalho sem nenhuma linha legível (ex.: nome com caracteres largos desalinhando as colunas) é leitura
+            // que falhou, não "nada desatualizado"
+            return programas.Count > 0 ? Lido.Ok(programas) : Lido.Pulado<IReadOnlyList<ProgramaDesatualizado>>(MotivoDoPulo.Erro);
         return codigoDeSaida is 0 or NenhumaAtualizacao
             ? Lido.Ok<IReadOnlyList<ProgramaDesatualizado>>([])
             : Lido.Pulado<IReadOnlyList<ProgramaDesatualizado>>(MotivoDoPulo.SemConexao);
