@@ -1,16 +1,20 @@
 namespace Triage.Verificacoes.Itens;
 
-// ESQUELETO da fase 3 (grupo "locais"): o subagente troca os textos e o Avaliar de verdade
 public sealed class TelasAzuis : IVerificacao
 {
     public string Id => "telas-azuis";
     public string Titulo => "Telas azuis";
-    public string OQueE => "";
-    public string PorQueImporta => "";
-    public string ComoResolver => "";
+    public string OQueE => "Vezes em que o Windows parou com a tela azul de erro (\"Seu PC encontrou um problema\") e reiniciou sozinho.";
+    public string PorQueImporta => "Uma isolada acontece. Repetindo, quase sempre é driver com defeito, memória RAM ou disco falhando, e tende a piorar.";
+    public string ComoResolver => "Instale as atualizações do Windows e dos drivers (principalmente o de vídeo). Se continuar, rode o \"Diagnóstico de Memória do Windows\" e confira a saúde do disco neste relatório.";
 
-    public Avaliacao Avaliar(FotoDoSistema foto, Limites limites) =>
-        foto.Eventos.Pulo is MotivoDoPulo motivo
-            ? Avaliacao.Pulada(motivo)
-            : Avaliacao.Pulada(MotivoDoPulo.NaoSuportado, "ainda não verificado");
+    public Avaliacao Avaliar(FotoDoSistema foto, Limites limites)
+    {
+        if (!foto.Eventos.FoiLido)
+            return Avaliacao.Pulada(foto.Eventos.Pulo!.Value);
+        var eventos = foto.Eventos.Valor!;
+        return new Avaliacao(
+            Resumos.PelaContagem(eventos.TelasAzuis, limites.TelasAzuisAtencao, limites.TelasAzuisCritico),
+            Resumos.Eventos(eventos.TelasAzuis, eventos.Dias));
+    }
 }
