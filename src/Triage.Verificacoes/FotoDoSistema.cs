@@ -17,7 +17,26 @@ public sealed record FotoDoSistema(
     Lido<ConteudoDaLixeira> Lixeira,
     Lido<DateTimeOffset> UltimaInicializacao,
     // Lido com valor nulo = o PC não tem bateria (desktop)
-    Lido<Bateria?> Bateria);
+    Lido<Bateria?> Bateria)
+{
+    // Fase 3. Leituras gravadas antes dela não têm estes campos: saem pulados ("este PC não informa")
+    private static Lido<T> NaoGravado<T>() => Lido.Pulado<T>(MotivoDoPulo.NaoSuportado);
+
+    /// <summary>Busca online no Windows Update (precisa de rede: falhou = SemConexao).</summary>
+    public Lido<AtualizacoesPendentes> Atualizacoes { get; init; } = NaoGravado<AtualizacoesPendentes>();
+    /// <summary>O Windows pediu reinício para terminar uma atualização (offline).</summary>
+    public Lido<bool> ReinicioPendente { get; init; } = NaoGravado<bool>();
+    /// <summary>Última atualização instalada com sucesso, sem contar definições do antivírus (offline). Nulo = nenhuma no histórico.</summary>
+    public Lido<DateTimeOffset?> UltimaAtualizacaoInstalada { get; init; } = NaoGravado<DateTimeOffset?>();
+    /// <summary>`winget upgrade` (precisa de rede: falhou = SemConexao; sem winget = NaoSuportado).</summary>
+    public Lido<IReadOnlyList<ProgramaDesatualizado>> ProgramasDesatualizados { get; init; } = NaoGravado<IReadOnlyList<ProgramaDesatualizado>>();
+    /// <summary>Só os que estão ligados (o Gerenciador de Tarefas desliga sem apagar).</summary>
+    public Lido<IReadOnlyList<ProgramaNaInicializacao>> Inicializacao { get; init; } = NaoGravado<IReadOnlyList<ProgramaNaInicializacao>>();
+    public Lido<IReadOnlyList<DispositivoComErro>> DriversComErro { get; init; } = NaoGravado<IReadOnlyList<DispositivoComErro>>();
+    public Lido<EventosDoSistema> Eventos { get; init; } = NaoGravado<EventosDoSistema>();
+    public Lido<Antivirus> Antivirus { get; init; } = NaoGravado<Antivirus>();
+    public Lido<Firewall> Firewall { get; init; } = NaoGravado<Firewall>();
+}
 
 /// <summary>Uma leitura que pode ter falhado: ou tem o valor, ou diz por que não tem.</summary>
 public sealed record Lido<T>(T? Valor, MotivoDoPulo? Pulo = null)
@@ -49,3 +68,30 @@ public sealed record ConteudoDaLixeira(long Bytes, long Itens);
 
 /// <summary>Capacidades em mWh, somando todas as baterias.</summary>
 public sealed record Bateria(int CapacidadeDeProjeto, int CapacidadeAtual, int? Ciclos);
+
+public sealed record AtualizacoesPendentes(int Pendentes, int DeSeguranca);
+
+/// <summary>Nome e versões como o winget mostra (P15 permite nome/versão de programa desatualizado).</summary>
+public sealed record ProgramaDesatualizado(string Nome, string Id, string Versao, string Disponivel);
+
+/// <summary>Nome do programa (valor do registro ou atalho sem ".lnk"), nunca o comando ou o caminho.</summary>
+public sealed record ProgramaNaInicializacao(string Nome, OrigemDaInicializacao Origem);
+
+public enum OrigemDaInicializacao { RegistroDoUsuario, RegistroDoSistema, PastaDoUsuario, PastaDoSistema }
+
+/// <summary>Dispositivo com erro no Gerenciador de Dispositivos (código do ConfigManagerErrorCode).</summary>
+public sealed record DispositivoComErro(string Nome, string Classe, int Codigo);
+
+/// <summary>Contagens no log do Sistema nos últimos <see cref="Dias"/> dias.</summary>
+public sealed record EventosDoSistema(int Dias, int DesligamentosInesperados, int TelasAzuis);
+
+/// <summary>Produto registrado na Central de Segurança do Windows (não existe no Windows Server).</summary>
+public sealed record ProdutoDeSeguranca(string Nome, bool Ativo, bool Atualizado);
+
+/// <summary>Produtos nulos = sem Central de Segurança; campos do Defender nulos = Defender não respondeu.</summary>
+public sealed record Antivirus(IReadOnlyList<ProdutoDeSeguranca>? Produtos, bool? DefenderTempoReal, int? DefenderIdadeDasDefinicoes);
+
+public sealed record PerfilDoFirewall(string Nome, bool Ligado);
+
+/// <summary>Perfis do Firewall do Windows (Domínio, Particular, Público) e firewalls de terceiros, se houver.</summary>
+public sealed record Firewall(IReadOnlyList<PerfilDoFirewall> Perfis, IReadOnlyList<ProdutoDeSeguranca>? OutrosFirewalls);

@@ -60,7 +60,7 @@ public sealed class ComandosTests : IDisposable
         Assert.Equal(Comandos.Sucesso, r.Codigo);
         Assert.Contains("Rodando sem admin", r.Saida);
         Assert.Contains("[OK           ] Saúde da bateria: 88% da capacidade original", r.Saida);
-        Assert.Contains("0 crítico · 0 atenção · 7 ok · 0 pulado", r.Saida);
+        Assert.Contains("0 crítico · 0 atenção · 7 ok", r.Saida);
     }
 
     [Fact]

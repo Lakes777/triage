@@ -15,6 +15,14 @@ public sealed class Motor(IReadOnlyList<IVerificacao> verificacoes)
         new TamanhoDaLixeira(),
         new TempoSemReiniciar(),
         new SaudeDaBateria(),
+        new AtualizacoesDoWindows(),
+        new ProgramasDesatualizados(),
+        new ProgramasNaInicializacao(),
+        new DriversComErro(),
+        new DesligamentosInesperados(),
+        new TelasAzuis(),
+        new AntivirusAtivo(),
+        new FirewallLigado(),
     ]);
 
     public Revisao Revisar(FotoDoSistema foto, Limites limites)

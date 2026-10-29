@@ -35,7 +35,18 @@ public static class Fotos
         Lido.Pulado<Pasta>(motivo),
         Lido.Pulado<ConteudoDaLixeira>(motivo),
         Lido.Pulado<DateTimeOffset>(motivo),
-        Lido.Pulado<Bateria?>(motivo));
+        Lido.Pulado<Bateria?>(motivo))
+    {
+        Atualizacoes = Lido.Pulado<AtualizacoesPendentes>(motivo),
+        ReinicioPendente = Lido.Pulado<bool>(motivo),
+        UltimaAtualizacaoInstalada = Lido.Pulado<DateTimeOffset?>(motivo),
+        ProgramasDesatualizados = Lido.Pulado<IReadOnlyList<ProgramaDesatualizado>>(motivo),
+        Inicializacao = Lido.Pulado<IReadOnlyList<ProgramaNaInicializacao>>(motivo),
+        DriversComErro = Lido.Pulado<IReadOnlyList<DispositivoComErro>>(motivo),
+        Eventos = Lido.Pulado<EventosDoSistema>(motivo),
+        Antivirus = Lido.Pulado<Antivirus>(motivo),
+        Firewall = Lido.Pulado<Firewall>(motivo),
+    };
 
     public const long Mb = 1L << 20;
     public const long Gb = 1L << 30;

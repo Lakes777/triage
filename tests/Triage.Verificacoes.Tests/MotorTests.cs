@@ -5,13 +5,14 @@ namespace Triage.Verificacoes.Tests;
 public class MotorTests
 {
     [Fact]
-    public void Notebook_de_verdade_sai_com_os_7_itens_e_todos_lidos()
+    public void Notebook_de_verdade_tem_os_7_itens_da_fase_2_lidos()
     {
         var revisao = Motor.Padrao().Revisar(Fotos.NotebookSemAdmin(), Limites.Padrao);
+        string[] fase2 = ["disco-saude", "espaco-livre", "temporarios", "cache-windows-update", "lixeira", "reinicio", "bateria"];
 
-        Assert.Equal(7, revisao.Resultados.Count);
+        Assert.Equal(15, revisao.Resultados.Count);
         Assert.False(revisao.Administrador);
-        Assert.DoesNotContain(revisao.Resultados, r => r.Avaliacao.Gravidade == Gravidade.Pulado);
+        Assert.DoesNotContain(revisao.Resultados, r => fase2.Contains(r.Item) && r.Avaliacao.Gravidade == Gravidade.Pulado);
         // Sem admin, o que ficou de fora aparece no resumo em vez de sumir
         Assert.Contains("precisa de admin", Resumo(revisao, "disco-saude"));
         Assert.Contains("pasta do Windows ficou de fora", Resumo(revisao, "temporarios"));
@@ -43,7 +44,7 @@ public class MotorTests
         var quebrada = Assert.Single(revisao.Resultados, r => r.Item == "quebrada");
         Assert.Equal(Gravidade.Pulado, quebrada.Avaliacao.Gravidade);
         Assert.Equal(MotivoDoPulo.Erro, quebrada.Avaliacao.Motivo);
-        Assert.Equal(8, revisao.Resultados.Count);
+        Assert.Equal(Motor.Padrao().Verificacoes.Count + 1, revisao.Resultados.Count);
     }
 
     [Fact]

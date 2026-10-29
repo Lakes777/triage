@@ -13,7 +13,7 @@ namespace Triage.Agente;
 /// segue. Nada de caminho, nome de usuário ou número de série entra na foto (P15).
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class LeitorDoWindows(TimeProvider relogio) : ILeitorDoSistema
+public sealed partial class LeitorDoWindows(TimeProvider relogio) : ILeitorDoSistema
 {
     private const string Armazenamento = @"root\Microsoft\Windows\Storage";
 
@@ -31,7 +31,19 @@ public sealed class LeitorDoWindows(TimeProvider relogio) : ILeitorDoSistema
             LerPasta(Path.Combine(windows, "SoftwareDistribution", "Download"), admin),
             Tentar(admin, LerLixeira),
             Tentar(admin, LerUltimaInicializacao),
-            Tentar(admin, LerBateria));
+            Tentar(admin, LerBateria))
+        {
+            // Fase 3: rede em LeitorDoWindows.Rede.cs, o resto em LeitorDoWindows.Locais.cs
+            Atualizacoes = LerAtualizacoesPendentes(admin),
+            ReinicioPendente = LerReinicioPendente(admin),
+            UltimaAtualizacaoInstalada = LerUltimaAtualizacaoInstalada(admin),
+            ProgramasDesatualizados = LerProgramasDesatualizados(admin),
+            Inicializacao = LerInicializacao(admin),
+            DriversComErro = LerDriversComErro(admin),
+            Eventos = LerEventos(admin, relogio),
+            Antivirus = LerAntivirus(admin),
+            Firewall = LerFirewall(admin),
+        };
     }
 
     private static Lido<T> Tentar<T>(bool admin, Func<T> ler)
