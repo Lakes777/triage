@@ -77,6 +77,24 @@ dotnet publish src/Triage.Agente -c Release -r win-x64 -o publicado
 
 O CI publica o `.exe` num Windows, roda e guarda o arquivo com o SHA-256 em cada execução.
 
+## Privacidade
+
+O Triage não manda nada para lugar nenhum por conta própria. Tudo roda no PC, sem internet. O envio ao
+servidor só acontece se você inscrever a máquina com um código (`triage inscrever`, fase 7), e mesmo assim só
+vão medidas e nome/versão de programas desatualizados: nunca nome de arquivo, de usuário ou de pasta.
+Nenhuma correção acontece sem você confirmar.
+
+## Baixando o .exe
+
+As versões ficam em [Releases](https://github.com/Lakes777/triage/releases), com o SHA-256 ao lado. O `.exe`
+ainda **não é assinado**: o Windows pode avisar (SmartScreen: "Mais informações" > "Executar assim mesmo") ou,
+com o Controle Inteligente de Aplicativos ligado, bloquear sem opção. A assinatura gratuita para código aberto
+(SignPath Foundation) está sendo pedida.
+
 ## Tecnologias
 
 C# / .NET 10 · gRPC · ASP.NET Core · Blazor · PostgreSQL · xUnit
+
+## Licença
+
+[MIT](LICENSE)
