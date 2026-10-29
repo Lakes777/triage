@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- Componentes Razor usados pelo agente (HTML estático, fase 4) e pelo painel (fase 9) -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Triage.Contratos\Triage.Contratos.csproj" />
+  </ItemGroup>
+
+</Project>

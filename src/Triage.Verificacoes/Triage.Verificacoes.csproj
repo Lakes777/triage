@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- O motor e as verificações (fase 2). Não depende do Windows: lê o sistema só por ILeitorDoSistema -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Triage.Contratos\Triage.Contratos.csproj" />
+  </ItemGroup>
+
+</Project>

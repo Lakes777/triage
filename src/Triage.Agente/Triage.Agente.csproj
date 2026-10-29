@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>triage</AssemblyName>
+    <RootNamespace>Triage.Agente</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Publicado para o Windows: um .exe só, com o .NET dentro (o PC não precisa ter o .NET instalado, P14).
+       Sem trimming por enquanto: a fase 4 decide, porque ele costuma quebrar o Razor do relatório. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Triage.Contratos\Triage.Contratos.csproj" />
+    <ProjectReference Include="..\Triage.Verificacoes\Triage.Verificacoes.csproj" />
+    <ProjectReference Include="..\Triage.Relatorio\Triage.Relatorio.csproj" />
+  </ItemGroup>
+
+</Project>

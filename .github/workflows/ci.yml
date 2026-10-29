@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - run: dotnet restore
+      - name: Formatação (dotnet format)
+        run: dotnet format --verify-no-changes --no-restore
+      - run: dotnet build --no-restore
+      - run: dotnet test --no-build
+
+  agente-windows:
+    # O WSL e o Linux não leem o Windows de verdade (WMI, log de eventos): aqui o .exe roda num Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Publicar o .exe (autocontido, arquivo único)
+        run: dotnet publish src/Triage.Agente -c Release -r win-x64 -o publicado
+      - name: Rodar o .exe
+        shell: pwsh
+        run: |
+          $saida = & .\publicado\triage.exe --versao
+          if ($LASTEXITCODE -ne 0) { throw "triage --versao saiu com $LASTEXITCODE" }
+          if ($saida -notmatch '^triage \d+\.\d+\.\d+') { throw "saída inesperada: $saida" }
+          $saida
+          & .\publicado\triage.exe comando-que-nao-existe 2>$null
+          if ($LASTEXITCODE -ne 2) { throw "comando desconhecido deveria sair com 2, saiu com $LASTEXITCODE" }
+          (Get-FileHash .\publicado\triage.exe -Algorithm SHA256).Hash.ToLower() + "  triage.exe" | Out-File -Encoding ascii publicado\triage.exe.sha256
+          Get-Content publicado\triage.exe.sha256
+          # O GitHub encerra o passo com o último $LASTEXITCODE, que ainda é o 2 de propósito lá de cima
+          exit 0
+      - uses: actions/upload-artifact@v5
+        with:
+          name: triage-win-x64
+          path: publicado/triage.exe*

@@ -1,0 +1,14 @@
+<Project>
+  <!-- Vale para todos os projetos da solução -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Aviso do compilador (ex.: possível null) quebra o build: melhor arrumar na hora -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Símbolos de depuração dentro de cada .dll: o .exe do agente sai sozinho, sem .pdb ao lado -->
+    <DebugType>embedded</DebugType>
+    <!-- Versão do agente e do servidor (os dois andam juntos); o git acrescenta o commit (+abc123...) -->
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+</Project>

@@ -189,6 +189,20 @@ README atualizado. Uma sessão nova por fase, começando por este arquivo.
 | 9. Interface | Painel Blazor (frota, máquina, revisão, inscrições, login do administrador) e identidade própria pela `/imagem-para-codigo`, aplicada ao painel e ao relatório local | Visitante só vê a demo (contraprova 404); acessível por teclado; GIF e prints no README |
 | 10. Publicação | `triage.andrelagos.dev` via `/publicar-vm` (só manual), gRPC pelo Caddy, Releases com SHA-256, cron da demo | No ar com HTTPS; `.exe` do Releases envia ao servidor de verdade; os outros sites da VM continuam respondendo; Vigil monitorando |
 
+> 29/10/2026 (fase 1, decidido ao fazer):
+> - Testes em `tests/Triage.<Projeto>.Tests` (padrão do Beacon). `Verificacoes` e `Relatorio` ganham projeto de teste
+>   nas fases 2 e 4: o xUnit v3 sem nenhum teste encerra com erro e quebraria o CI.
+> - Versão única `0.1.0` no `Directory.Build.props` para agente e servidor; o `--versao` mostra o commit curto
+>   (`0.1.0+9c3e94b`). gRPC 2.85, `.proto` em `triage.v1` com só `Versao` por enquanto.
+> - O agente força a saída em UTF-8 (o console do Windows nasce em 850/1252 e "versão" saía quebrado). Símbolos de
+>   depuração embutidos (`DebugType embedded`): o `.exe` sai sozinho, ~38 MB com compressão, sem trimming.
+> - **Para a fase 6 (revisor):** sem HTTPS o Kestrel só fala HTTP/1.1, e o gRPC exige HTTP/2 (o teste passa porque o
+>   `TestServer` não usa o Kestrel). Duas portas: uma `Http1` para `/saude` e o painel (WebSocket do Blazor), outra
+>   `Http2` para o gRPC, com o Caddy em `h2c://`. E a imagem Docker é montada sem `.git`: o servidor diz `0.1.0` e o
+>   `.exe` `0.1.0+abc1234`, então comparar versões só pela parte antes do `+`.
+> - **Para a fase 2 (P11, "roda no clique"):** hoje, sem argumento, o agente mostra a ajuda e a janela do duplo clique
+>   fecha na hora. Na fase 2, sem argumento = `revisar` e esperar Enter antes de fechar.
+
 Boas para subagentes (em worktree):
 
 - **Fases 2 e 3:** cada verificação é uma classe sem dependência das outras, lendo só pela

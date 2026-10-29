@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Triage.Agente/Triage.Agente.csproj" />
+    <Project Path="src/Triage.Contratos/Triage.Contratos.csproj" />
+    <Project Path="src/Triage.Relatorio/Triage.Relatorio.csproj" />
+    <Project Path="src/Triage.Servidor/Triage.Servidor.csproj" />
+    <Project Path="src/Triage.Verificacoes/Triage.Verificacoes.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Triage.Agente.Tests/Triage.Agente.Tests.csproj" />
+    <Project Path="tests/Triage.Servidor.Tests/Triage.Servidor.Tests.csproj" />
+  </Folder>
+</Solution>

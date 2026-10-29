@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option csharp_namespace = "Triage.Contratos.Grpc";
+
+package triage.v1;
+
+// O que o agente chama no servidor. Cresce nas fases 6 e 7 (Inscrever, EnviarRevisao).
+// Regra da P15: nenhuma mensagem tem campo para caminho, usuário ou nome de arquivo.
+service Triagem {
+  // O agente confere com quem está falando antes de mandar qualquer coisa.
+  rpc Versao (VersaoPedido) returns (VersaoResposta);
+}
+
+message VersaoPedido {
+  string versao_do_agente = 1;
+}
+
+message VersaoResposta {
+  string versao_do_servidor = 1;
+}
