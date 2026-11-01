@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Grpc.Net.Client" Version="2.85.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.15.0" />
     <PackageReference Include="xunit.v3" Version="4.0.1" />
   </ItemGroup>
 
@@ -18,6 +19,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Triage.Servidor\Triage.Servidor.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- A leitura gravada do notebook: a foto real que o agente manda (P15) -->
+    <None Include="..\dados\*.json" Link="dados\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

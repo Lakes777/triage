@@ -312,6 +312,44 @@ README atualizado. Uma sessão nova por fase, começando por este arquivo.
 >   agendar/desagendar passam pelo `schtasks`. Falta o critério do SPEC "primeiro uso real no notebook só nos
 >   temporários": depende do Controle Inteligente liberar o `.exe` (ou da SignPath).
 
+> 01/11/2026 (fase 6, decidido ao fazer):
+> - **Contrato:** `Inscrever` (código + apelido -> id da máquina + chave) e `EnviarRevisao` (metadados
+>   `triage-maquina` e `triage-chave`). A revisão leva a **foto em JSON** (a mesma do `triage gravar`, só medidas,
+>   guardada em `jsonb` para o histórico da fase 8) e, por item, só id, gravidade e motivo: os textos o servidor
+>   monta com o catálogo de verificações (decidido na fase 4). Gravidade e motivo viraram enums no `.proto`. Item
+>   desconhecido com cara de id é aceito (agente mais novo que o servidor). Um teste lê o descritor do `.proto` e
+>   recusa campo com nome de caminho/usuário/arquivo (P15); outro confere a foto real do notebook.
+> - **Inscrição (P10):** código de 12 caracteres em base32 de Crockford (sem I, L, O, U), mostrado `XXXX-XXXX-XXXX`,
+>   aceito em minúsculas e sem traço; 60 bits + limite de 10 inscrições por minuto por IP. Código malformado,
+>   inexistente, usado ou vencido dão a mesma mensagem. Chave = 32 bytes em base64url; banco guarda SHA-256 e compara
+>   com `FixedTimeEquals` (máquina desconhecida também compara, com um hash qualquer). Contraprova feita: sem
+>   `usado_em IS NULL`, as 20 inscrições criam mais de uma máquina.
+> - **Revogação x envio:** o envio lê a máquina com `FOR SHARE` dentro da transação; a revogação é um `UPDATE`.
+>   O teste segura o envio depois de conferir a máquina (gancho `PontosDeTeste`) e prova que a revogação espera.
+>   Contraprova feita: sem o `FOR SHARE`, a revogação passa na frente.
+> - **2x = 1x (servidor):** `INSERT ... ON CONFLICT (maquina_id, id) DO NOTHING`; se já existia, compara o SHA-256 do
+>   pedido inteiro: igual = sucesso com `gravada_agora = false`; diferente = `ALREADY_EXISTS`. Chave (máquina, id):
+>   o mesmo UUID em duas máquinas não se mistura. 10 envios simultâneos da mesma revisão = 1 gravação.
+> - **Códigos gRPC para a fase 7:** `UNAUTHENTICATED` (chave/máquina) e `PERMISSION_DENIED` (revogada) = parar e
+>   avisar; `INVALID_ARGUMENT`/`ALREADY_EXISTS` = tirar da fila; o resto = tentar depois.
+> - **Administrador:** `gerar-codigo`, `maquinas`, `revogar <id>` como argumento do próprio servidor (padrão do
+>   Beacon), sem rota pública. Migrações do EF rodam ao subir. Kestrel com duas portas (8080 HTTP/1.1 para `/saude`
+>   e o painel, 8081 HTTP/2 para o gRPC). `/saude` inclui o banco. Mensagem gRPC até 256 KB.
+> - **Revisor (corrigido):** (1) entradas que passavam pela validação e o Postgres recusava (item com 65
+>   caracteres, `\u0000` ou surrogate solto na foto, número gigante, `feita_em` zerado ou fora da faixa) viravam erro
+>   interno, e o agente tentaria para sempre: agora são `INVALID_ARGUMENT` (validação + erro de classe 22 do Postgres),
+>   `feita_em` só de 2026 até amanhã; (2) gravidade/motivo fora do enum eram gravados como outro valor: recusados;
+>   (3) o limite da inscrição comparava o caminho como texto e `/Inscrever/` (barra no fim) escapava: agora é política
+>   no método (`[EnableRateLimiting]`), com teste da barra; (4) `EnviarRevisao` sem limite: 60 por minuto por IP e
+>   **50 revisões novas por máquina por dia** (`RESOURCE_EXHAUSTED`; o reenvio do mesmo id não conta); apelido sem
+>   invisíveis de formatação (U+202E, largura zero); versão só `[0-9A-Za-z.+-]`; horas do `maquinas` com "UTC".
+> - **Para a fase 7:** a fila guarda o **pedido serializado** (bytes do protobuf), não a revisão para remontar: o
+>   servidor compara o SHA-256 do pedido, e um JSON reserializado ou um `feita_em` com outra precisão fariam o
+>   reenvio legítimo dar `ALREADY_EXISTS`.
+> - **Para a fase 10:** o limite por IP precisa do `X-Forwarded-For` do Caddy (sem ele, todo mundo vira o IP do
+>   Caddy), aceitando o cabeçalho só da rede do Caddy (`KnownIPNetworks`, como no Beacon), senão ele é forjado;
+>   e repetir o `deploy/separar-papeis.sh` do Beacon para o banco `triage`.
+
 Boas para subagentes (em worktree):
 
 - **Fases 2 e 3:** cada verificação é uma classe sem dependência das outras, lendo só pela

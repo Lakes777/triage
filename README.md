@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/Lakes777/triage/actions/workflows/ci.yml/badge.svg)](https://github.com/Lakes777/triage/actions/workflows/ci.yml)
 
-> Em construção: fase 5 de 10 (15 verificações, relatório HTML e correções com confirmação). O plano inteiro está em [docs/SPEC.md](docs/SPEC.md).
+> Em construção: fase 6 de 10 (agente completo; servidor com inscrição e recebimento de revisões). O plano inteiro está em [docs/SPEC.md](docs/SPEC.md).
 
 Um agente que roda no computador, confere o que costuma dar problema (disco gastando, espaço acabando,
 bateria cansada, atualizações paradas, telas azuis, Defender desligado...) e gera um relatório com o que é,
@@ -98,9 +98,12 @@ As verificações nunca leem o Windows direto: recebem uma "foto" do sistema. No
 Precisa do [.NET 10](https://dotnet.microsoft.com/download).
 
 ```bash
-dotnet test                                   # testes (rodam no Linux)
+dotnet test                                   # testes (rodam no Linux; os do servidor pedem o Docker)
 dotnet run --project src/Triage.Agente -- revisar --leitura tests/dados/notebook-sem-admin.json
-dotnet run --project src/Triage.Servidor      # /saude (o gRPC pede HTTP/2: porta própria na fase 6)
+docker compose up -d                          # Postgres do servidor (porta 5437); os testes sobem o próprio
+dotnet run --project src/Triage.Servidor      # /saude na 8080, gRPC (HTTP/2) na 8081
+dotnet run --project src/Triage.Servidor -- gerar-codigo   # código de inscrição (uso único, 24 h)
+dotnet run --project src/Triage.Servidor -- maquinas       # máquinas inscritas; revogar <id> corta uma
 
 # o .exe do Windows, um arquivo só, com o .NET dentro (o PC não precisa ter o .NET)
 dotnet publish src/Triage.Agente -c Release -r win-x64 -o publicado

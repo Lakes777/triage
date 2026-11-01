@@ -4,11 +4,20 @@ option csharp_namespace = "Triage.Contratos.Grpc";
 
 package triage.v1;
 
-// O que o agente chama no servidor. Cresce nas fases 6 e 7 (Inscrever, EnviarRevisao).
-// Regra da P15: nenhuma mensagem tem campo para caminho, usuário ou nome de arquivo.
+import "google/protobuf/timestamp.proto";
+
+// O que o agente chama no servidor.
+// Regra da P15: nenhuma mensagem tem campo para caminho, usuário ou nome de arquivo (um teste confere).
 service Triagem {
   // O agente confere com quem está falando antes de mandar qualquer coisa.
   rpc Versao (VersaoPedido) returns (VersaoResposta);
+
+  // Troca um código de inscrição (uso único, 24 h, gerado pelo administrador) pela chave da máquina.
+  rpc Inscrever (InscreverPedido) returns (InscreverResposta);
+
+  // Manda uma revisão. Pede os metadados "triage-maquina" e "triage-chave". O id nasce no agente: mandar a
+  // mesma revisão de novo é sucesso sem gravar outra vez; o mesmo id com outro conteúdo é erro (ALREADY_EXISTS).
+  rpc EnviarRevisao (EnviarRevisaoPedido) returns (EnviarRevisaoResposta);
 }
 
 message VersaoPedido {
@@ -17,4 +26,58 @@ message VersaoPedido {
 
 message VersaoResposta {
   string versao_do_servidor = 1;
+}
+
+message InscreverPedido {
+  string codigo = 1;
+  // Como o PC aparece no painel ("notebook da sala"): é o único nome que o servidor conhece (P15).
+  string apelido = 2;
+  string versao_do_agente = 3;
+}
+
+message InscreverResposta {
+  string maquina_id = 1;
+  // Mostrada uma vez só: o servidor guarda apenas o SHA-256 dela.
+  string chave = 2;
+}
+
+message EnviarRevisaoPedido {
+  // UUID gerado pelo agente quando revisou.
+  string revisao_id = 1;
+  google.protobuf.Timestamp feita_em = 2;
+  string versao_do_agente = 3;
+  bool administrador = 4;
+  repeated ResultadoDoItem resultados = 5;
+  // A foto do sistema no JSON do "triage gravar": só medidas (P15). O servidor guarda para o histórico (fase 8).
+  string foto_json = 6;
+}
+
+message ResultadoDoItem {
+  // Id da verificação ("espaco-livre").
+  string item = 1;
+  Gravidade gravidade = 2;
+  MotivoDoPulo motivo = 3;
+}
+
+enum Gravidade {
+  GRAVIDADE_DESCONHECIDA = 0;
+  GRAVIDADE_OK = 1;
+  GRAVIDADE_ATENCAO = 2;
+  GRAVIDADE_CRITICO = 3;
+  GRAVIDADE_PULADO = 4;
+  GRAVIDADE_NAO_SE_APLICA = 5;
+}
+
+enum MotivoDoPulo {
+  MOTIVO_NENHUM = 0;
+  MOTIVO_SEM_ADMIN = 1;
+  MOTIVO_SEM_CONEXAO = 2;
+  MOTIVO_SEM_PERMISSAO = 3;
+  MOTIVO_NAO_SUPORTADO = 4;
+  MOTIVO_ERRO = 5;
+}
+
+message EnviarRevisaoResposta {
+  // Falso quando a mesma revisão já estava gravada (envio repetido pela fila).
+  bool gravada_agora = 1;
 }

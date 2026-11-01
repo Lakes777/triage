@@ -1,0 +1,20 @@
+# Postgres para rodar o servidor do Triage no seu computador: docker compose up -d
+# Porta 5437 (5433 Vigil, 5434 Beacon, 5435 e 5436 de outros projetos). Os testes não usam este: sobem o próprio
+# Postgres com o Testcontainers.
+services:
+  banco:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: triage
+      POSTGRES_USER: triage
+      POSTGRES_PASSWORD: triage
+    ports:
+      - "127.0.0.1:5437:5432"
+    volumes:
+      - dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U triage -d triage"]
+      interval: 5s
+
+volumes:
+  dados:
