@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/Lakes777/triage/actions/workflows/ci.yml/badge.svg)](https://github.com/Lakes777/triage/actions/workflows/ci.yml)
 
-> Em construção: fase 3 de 10 (15 verificações). O plano inteiro está em [docs/SPEC.md](docs/SPEC.md).
+> Em construção: fase 4 de 10 (15 verificações e relatório HTML). O plano inteiro está em [docs/SPEC.md](docs/SPEC.md).
 
 Um agente que roda no computador, confere o que costuma dar problema (disco gastando, espaço acabando,
 bateria cansada, atualizações paradas, telas azuis, Defender desligado...) e gera um relatório com o que é,
@@ -58,7 +58,14 @@ Rodando sem admin: alguns itens ficam de fora (rode como administrador para ver 
 [OK           ] Saúde da bateria: 88% da capacidade original (38,1 de 43,1 Wh), 22 ciclos de carga
 
 0 crítico · 0 atenção · 7 ok · 0 pulado
+
+Relatório completo: C:\Users\...\AppData\Local\Triage\relatorios\revisao-2026-10-29-115024.html
 ```
+
+O relatório completo abre no navegador: um arquivo HTML só, sem internet, com o que é, por que importa e como
+resolver cada item (os problemas primeiro). Ele **não executa nada**: não tem script nem endereço externo (um
+teste garante, e a página ainda pede ao navegador para bloquear os dois). As correções são feitas no terminal,
+com confirmação. Os 20 relatórios mais recentes ficam guardados; `triage revisar --sem-abrir` gera sem abrir.
 
 As verificações nunca leem o Windows direto: recebem uma "foto" do sistema. No `.exe` a foto vem do Windows
 (WMI, `powercfg`, API da lixeira); nos testes, de leituras gravadas de PCs de verdade com `triage gravar`
@@ -77,7 +84,8 @@ dotnet run --project src/Triage.Servidor      # /saude (o gRPC pede HTTP/2: port
 dotnet publish src/Triage.Agente -c Release -r win-x64 -o publicado
 ```
 
-O CI publica o `.exe` num Windows, roda e guarda o arquivo com o SHA-256 em cada execução.
+O CI publica o `.exe` num Windows, roda a revisão de verdade e guarda o `.exe` (com o SHA-256) e o relatório
+gerado lá em cada execução.
 
 ## Privacidade
 

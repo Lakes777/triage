@@ -2,7 +2,7 @@ using Triage.Verificacoes;
 
 namespace Triage.Agente;
 
-/// <summary>A revisão no terminal. O relatório HTML chega na fase 4.</summary>
+/// <summary>A revisão no terminal. O relatório completo é o HTML (Triage.Relatorio).</summary>
 public static class SaidaEmTexto
 {
     public static void Escrever(Revisao revisao, TextWriter saida)
@@ -28,12 +28,5 @@ public static class SaidaEmTexto
             .Select(g => $"{contagem.GetValueOrDefault(g)} {Rotulo(g).ToLower(Textos.Cultura)}")));
     }
 
-    private static string Rotulo(Gravidade g) => g switch
-    {
-        Gravidade.Critico => "CRÍTICO",
-        Gravidade.Atencao => "ATENÇÃO",
-        Gravidade.Ok => "OK",
-        Gravidade.Pulado => "PULADO",
-        _ => "NÃO SE APLICA",
-    };
+    private static string Rotulo(Gravidade g) => Textos.Rotulo(g).ToUpper(Textos.Cultura);
 }

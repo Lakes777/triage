@@ -28,6 +28,16 @@ public static class Textos
         _ => "erro ao ler",
     };
 
+    /// <summary>O nome da gravidade para gente ler, igual no terminal e no relatório.</summary>
+    public static string Rotulo(Gravidade g) => g switch
+    {
+        Gravidade.Critico => "Crítico",
+        Gravidade.Atencao => "Atenção",
+        Gravidade.Ok => "OK",
+        Gravidade.Pulado => "Pulado",
+        _ => "Não se aplica",
+    };
+
     public static Gravidade Pior(IEnumerable<Gravidade> gravidades) =>
         gravidades.DefaultIfEmpty(Gravidade.Ok).MaxBy(Peso);
 

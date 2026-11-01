@@ -242,8 +242,34 @@ README atualizado. Uma sessão nova por fase, começando por este arquivo.
 >   (2) firewall lê a configuração local, não a efetiva (política de grupo): usar `HNetCfg.FwPolicy2` ou `ActiveStore`;
 >   (3) serviço do Windows Update desativado (0x80070422) sai "pulado: erro", mas é o problema a mostrar (atenção);
 >   (4) as regras de pulo do antivírus e do firewall estão no leitor do Windows, sem teste: levar para função pura;
->   (5) fase 4: o trimming desliga o `BuiltInComInteropSupport` e quebraria o COM do Windows Update;
+>   (5) ~~fase 4: o trimming desliga o `BuiltInComInteropSupport` e quebraria o COM do Windows Update;~~
+>   **decidido na fase 4:** sem trimming (ver abaixo);
 >   (6) o CI ainda não exige o histórico do Windows Update (pode estar desligado na imagem); exigir depois de ver.
+
+> 01/11/2026 (fase 4, decidido ao fazer):
+> - **Relatório = componentes Razor** em `Triage.Relatorio` (`PaginaDoRelatorio`, `CartaoDoItem`), renderizados pelo
+>   `HtmlRenderer` sem servidor. `Triage.Relatorio` passou a depender de `Triage.Verificacoes` (usa a `Revisao`, que não
+>   depende do Windows): o servidor da fase 6 remonta a `Revisao` com os textos do mesmo catálogo de verificações, em
+>   vez de mandar os textos pelo gRPC.
+> - **Sem trimming:** o `.exe` sai com ~38 MB, e o trimming quebraria o COM do Windows Update e arrisca o Razor (que
+>   lê os `[Parameter]` por reflexão). A prova da P22 é o CI: o `.exe` autocontido num Windows gera o relatório, e o
+>   passo falha sem os itens ou com script/endereço externo (o HTML do CI vai junto no artefato).
+> - **Segurança da página (P20):** sem script, sem endereço externo, sem nenhum link além de âncora (`#item-...`),
+>   CSS embutido; e a política `default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'`
+>   no `<meta>`, para o navegador barrar o que escapasse. A política **não** barra clique em link nem meta refresh:
+>   por isso o teste recusa qualquer endereço que não seja âncora (o revisor achou `ms-msdt:`, `search-ms:` e
+>   `file://` passando na 1ª versão, além de `<svg/onload>`, `jav&#x61;script:` e `\75rl()` no CSS). Contraprova: o
+>   verificador pega 28 tipos de HTML perigoso, e um `<script>` posto na página quebra o teste. Texto que vem do PC
+>   (nome de programa) sai escapado pelo Razor.
+> - O codificador padrão trocava todo acento por entidade (`&#xFA;`): o gerador registra
+>   `HtmlEncoder.Create(UnicodeRanges.All)`, o mesmo comportamento do Blazor no painel.
+> - `triage revisar` grava em `%LOCALAPPDATA%\Triage\relatorios\revisao-AAAA-MM-DD-HHMMSS.html`, mostra o caminho e
+>   abre no navegador padrão; `--sem-abrir` para o CI e para a revisão agendada da fase 5. Guarda os 20 mais
+>   recentes e só apaga `revisao-*.html` (o Triage não vira lixo no PC); o relatório recém-gerado nunca entra na
+>   conta (uma leitura antiga dá a ele o nome mais "velho") e arquivo que não apaga vira aviso. Navegador que não
+>   abre = aviso, não erro.
+> - Problemas (crítico/atenção) vêm abertos; o resto fecha num `<details>` (abre no clique e no teclado, sem script).
+>   Visual provisório e neutro, com tema claro/escuro: a identidade própria fica para a fase 9.
 
 Boas para subagentes (em worktree):
 

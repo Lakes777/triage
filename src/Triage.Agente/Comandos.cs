@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Text.Json;
 using Triage.Contratos;
+using Triage.Relatorio;
 using Triage.Verificacoes;
 
 namespace Triage.Agente;
@@ -7,11 +9,12 @@ namespace Triage.Agente;
 /// <summary>
 /// Entrada do terminal. Cada fase acrescenta o seu comando aqui (corrigir, inscrever...).
 /// <paramref name="leitorDoSistema"/> devolve nulo fora do Windows; <paramref name="pastaDoTriage"/> é onde mora
-/// o limites.json (%LOCALAPPDATA%\Triage no Windows).
+/// o limites.json e os relatórios (%LOCALAPPDATA%\Triage no Windows). <paramref name="abrirNoNavegador"/> devolve
+/// falso quando não deu para abrir (fora do Windows, sem navegador padrão).
 /// </summary>
 public sealed class Comandos(
     TextReader entrada, TextWriter saida, TextWriter erros,
-    Func<ILeitorDoSistema?> leitorDoSistema, string pastaDoTriage)
+    Func<ILeitorDoSistema?> leitorDoSistema, string pastaDoTriage, Func<string, bool> abrirNoNavegador)
 {
     public const int Sucesso = 0;
     public const int Falha = 1;
@@ -21,9 +24,10 @@ public sealed class Comandos(
         Triage: revisa este PC e diz o que fazer.
 
         Uso:
-          triage                            revisa e espera Enter (para o duplo clique)
-          triage revisar                    revisa este PC
+          triage                            revisa, abre o relatório e espera Enter (para o duplo clique)
+          triage revisar                    revisa este PC e abre o relatório no navegador
           triage revisar --leitura <arq>    revisa uma leitura gravada, em vez deste PC
+          triage revisar --sem-abrir        gera o relatório sem abrir o navegador
           triage gravar <arq>               grava a leitura deste PC em JSON (só medidas, sem nomes)
           triage --versao                   mostra a versão
           triage --ajuda                    mostra esta ajuda
@@ -34,7 +38,7 @@ public sealed class Comandos(
         if (args is [])
         {
             // Duplo clique: sem esperar, a janela fecharia antes de dar para ler (P11), até se der erro
-            var codigo = Protegido(() => Revisar(leitorDoSistema()));
+            var codigo = Protegido(() => Revisar(leitorDoSistema(), abrir: true));
             saida.WriteLine();
             saida.WriteLine("Aperte Enter para fechar.");
             entrada.ReadLine();
@@ -60,10 +64,8 @@ public sealed class Comandos(
     {
         switch (args)
         {
-            case ["revisar"]:
-                return Revisar(leitorDoSistema());
-            case ["revisar", "--leitura", var arquivo]:
-                return Revisar(new LeitorGravado(arquivo));
+            case ["revisar", .. var opcoes]:
+                return Revisar(opcoes);
             case ["gravar", var arquivo]:
                 return Gravar(leitorDoSistema(), arquivo);
             case ["--versao"]:
@@ -79,7 +81,42 @@ public sealed class Comandos(
         }
     }
 
-    private int Revisar(ILeitorDoSistema? leitor)
+    private int Revisar(string[] opcoes)
+    {
+        string? leitura = null;
+        var abrir = true;
+        string? problema = null;
+        for (var i = 0; i < opcoes.Length && problema is null; i++)
+        {
+            switch (opcoes[i])
+            {
+                case "--leitura" or "--sem-abrir" when opcoes[..i].Contains(opcoes[i]):
+                    problema = $"Opção repetida: {opcoes[i]}";
+                    break;
+                case "--leitura" when i + 1 < opcoes.Length && !opcoes[i + 1].StartsWith("--", StringComparison.Ordinal):
+                    leitura = opcoes[++i];
+                    break;
+                case "--leitura":
+                    problema = "Falta o arquivo depois de --leitura";
+                    break;
+                case "--sem-abrir":
+                    abrir = false;
+                    break;
+                default:
+                    problema = $"Opção desconhecida: {opcoes[i]}";
+                    break;
+            }
+        }
+        if (problema is not null)
+        {
+            erros.WriteLine(problema);
+            erros.WriteLine(Ajuda);
+            return UsoErrado;
+        }
+        return Revisar(leitura is null ? leitorDoSistema() : new LeitorGravado(leitura), abrir);
+    }
+
+    private int Revisar(ILeitorDoSistema? leitor, bool abrir)
     {
         if (leitor is null)
             return SoNoWindows();
@@ -95,7 +132,30 @@ public sealed class Comandos(
         }
         var revisao = Motor.Padrao().Revisar(leitor.Ler(), limites);
         SaidaEmTexto.Escrever(revisao, saida);
+
+        var relatorio = GuardarRelatorio(revisao);
+        saida.WriteLine();
+        saida.WriteLine($"Relatório completo: {relatorio}");
+        if (abrir && !abrirNoNavegador(relatorio))
+            saida.WriteLine("Não deu para abrir o navegador: abra o arquivo acima.");
         return Sucesso;
+    }
+
+    private string GuardarRelatorio(Revisao revisao)
+    {
+        var pasta = Directory.CreateDirectory(Path.Combine(pastaDoTriage, "relatorios")).FullName;
+        // A data no nome deixa a ordem alfabética igual à ordem no tempo
+        var arquivo = Path.Combine(pasta, $"revisao-{revisao.FeitaEm.ToString("yyyy-MM-dd-HHmmss", CultureInfo.InvariantCulture)}.html");
+        File.WriteAllText(arquivo, GeradorDeRelatorio.Gerar(revisao, VersaoDoTriage.Atual));
+        ApagarRelatoriosAntigos(pasta, arquivo);
+        return arquivo;
+    }
+
+    private void ApagarRelatoriosAntigos(string pasta, string atual)
+    {
+        var falhas = PastaDeRelatorios.ApagarAntigos(pasta, atual);
+        if (falhas > 0)
+            erros.WriteLine($"Aviso: {falhas} relatório(s) antigo(s) não puderam ser apagados em {pasta}.");
     }
 
     private int Gravar(ILeitorDoSistema? leitor, string arquivo)

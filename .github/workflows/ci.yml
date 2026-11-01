@@ -39,8 +39,23 @@ jobs:
           & .\publicado\triage.exe comando-que-nao-existe 2>$null
           if ($LASTEXITCODE -ne 2) { throw "comando desconhecido deveria sair com 2, saiu com $LASTEXITCODE" }
           # A revisão de verdade num Windows (o runner é administrador: lê também o desgaste e C:\Windows\Temp)
-          & .\publicado\triage.exe revisar
+          # O .exe escreve em UTF-8; sem isto o PowerShell lê com a página antiga e "Relatório" chega quebrado
+          [Console]::OutputEncoding = [Text.Encoding]::UTF8
+          $revisao = & .\publicado\triage.exe revisar --sem-abrir
           if ($LASTEXITCODE -ne 0) { throw "triage revisar saiu com $LASTEXITCODE" }
+          $revisao
+          # Prova da P22: os componentes Razor renderizam dentro do .exe autocontido (arquivo único, sem trimming)
+          $linha = $revisao | Where-Object { $_ -like 'Relatório completo: *' } | Select-Object -Last 1
+          if (-not $linha) { throw "o revisar não mostrou o caminho do relatório" }
+          $relatorio = $linha.Substring('Relatório completo: '.Length)
+          if (-not (Test-Path $relatorio)) { throw "o relatório mostrado não existe: $relatorio" }
+          $html = Get-Content $relatorio -Raw -Encoding utf8
+          if ($html -notmatch 'Saúde dos discos' -or $html -notmatch 'id="item-firewall"') { throw "relatório sem os itens" }
+          # Versão curta do HtmlSeguro dos testes, agora sobre o HTML que o .exe gerou de verdade
+          if ($html -match '<\s*(script|svg|iframe|object|embed|form|img)|[a-z]+://|[\s/"'']on[a-z]+\s*=|(href|src|action)\s*=|<meta[^>]*refresh|url\s*\(') {
+            throw "relatório com script, link ou endereço externo: $($Matches[0])"
+          }
+          Copy-Item $relatorio publicado\relatorio-ci.html
           & .\publicado\triage.exe gravar leitura-ci.json
           if ($LASTEXITCODE -ne 0) { throw "triage gravar saiu com $LASTEXITCODE" }
           Get-Content leitura-ci.json
@@ -60,4 +75,6 @@ jobs:
       - uses: actions/upload-artifact@v5
         with:
           name: triage-win-x64
-          path: publicado/triage.exe*
+          path: |
+            publicado/triage.exe*
+            publicado/relatorio-ci.html

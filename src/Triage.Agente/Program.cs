@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using Triage.Agente;
 using Triage.Verificacoes;
@@ -11,4 +12,21 @@ var pastaDoTriage = Path.Combine(
 ILeitorDoSistema? LeitorDoSistema() =>
     OperatingSystem.IsWindows() ? new LeitorDoWindows(TimeProvider.System) : null;
 
-return new Comandos(Console.In, Console.Out, Console.Error, LeitorDoSistema, pastaDoTriage).Executar(args);
+// O navegador padrão abre o .html; fora do Windows (revisar --leitura no WSL) só o caminho é mostrado
+static bool AbrirNoNavegador(string arquivo)
+{
+    if (!OperatingSystem.IsWindows())
+        return false;
+    try
+    {
+        using var _ = Process.Start(new ProcessStartInfo(arquivo) { UseShellExecute = true });
+        return true;
+    }
+    catch (Exception erro) when (erro is System.ComponentModel.Win32Exception or InvalidOperationException)
+    {
+        return false;
+    }
+}
+
+return new Comandos(Console.In, Console.Out, Console.Error, LeitorDoSistema, pastaDoTriage, AbrirNoNavegador)
+    .Executar(args);

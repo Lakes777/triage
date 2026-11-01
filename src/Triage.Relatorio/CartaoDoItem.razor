@@ -1,0 +1,28 @@
+@* Um item da revisão. Problemas já vêm abertos; o resto abre no clique (details, sem script). *@
+<article class="item g-@PaginaDoRelatorio.Classe(G)" id="item-@Resultado.Item">
+    <details open="@Problema">
+        @* O grid fica num span de dentro: no próprio summary ele apagaria o triângulo que mostra que o item abre *@
+        <summary>
+            <span class="linha">
+                <span class="selo">@Textos.Rotulo(G)</span>
+                <span class="titulo">@Resultado.Titulo</span>
+                <span class="resumo">@Resultado.Avaliacao.Resumo</span>
+            </span>
+        </summary>
+        <dl>
+            <dt>O que é</dt>
+            <dd>@Resultado.OQueE</dd>
+            <dt>Por que importa</dt>
+            <dd>@Resultado.PorQueImporta</dd>
+            <dt>Como resolver</dt>
+            <dd>@Resultado.ComoResolver</dd>
+        </dl>
+    </details>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public Resultado Resultado { get; set; } = default!;
+
+    private Gravidade G => Resultado.Avaliacao.Gravidade;
+    private bool Problema => G is Gravidade.Critico or Gravidade.Atencao;
+}

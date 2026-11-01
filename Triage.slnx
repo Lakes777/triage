@@ -8,6 +8,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Triage.Agente.Tests/Triage.Agente.Tests.csproj" />
+    <Project Path="tests/Triage.Relatorio.Tests/Triage.Relatorio.Tests.csproj" />
     <Project Path="tests/Triage.Servidor.Tests/Triage.Servidor.Tests.csproj" />
     <Project Path="tests/Triage.Verificacoes.Tests/Triage.Verificacoes.Tests.csproj" />
   </Folder>

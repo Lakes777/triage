@@ -1,0 +1,81 @@
+@* A página inteira do relatório local: um arquivo só, sem nada de fora (P20). *@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    @* Mesmo que um texto escape do Razor, o navegador não roda script nem busca nada fora do arquivo *@
+    <meta http-equiv="Content-Security-Policy" content="@GeradorDeRelatorio.Politica">
+    <meta name="referrer" content="no-referrer">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Triage · revisão de @Data</title>
+    <style>@((MarkupString)Estilo.Css)</style>
+</head>
+<body>
+    <header class="topo">
+        <p class="marca">Triage</p>
+        <h1>Revisão deste PC</h1>
+        <p class="quando">Feita em @Data · versão @Versao</p>
+        @if (!Revisao.Administrador)
+        {
+            <p class="aviso">Rodou sem administrador: alguns itens ficaram de fora. Para ver tudo, abra o Triage como administrador.</p>
+        }
+        <ul class="contagem" aria-label="Resumo">
+            @foreach (var g in OrdemDaContagem)
+            {
+                <li class="g-@Classe(g)"><strong>@Quantos(g)</strong> @Textos.Rotulo(g).ToLower(Textos.Cultura)</li>
+            }
+        </ul>
+    </header>
+
+    <main>
+        @foreach (var (titulo, gravidades) in Grupos)
+        {
+            var itens = Revisao.Resultados.Where(r => gravidades.Contains(r.Avaliacao.Gravidade)).ToList();
+            if (itens.Count == 0)
+                continue;
+            <section>
+                <h2>@titulo <span class="quantos">(@itens.Count)</span></h2>
+                @foreach (var r in itens)
+                {
+                    <CartaoDoItem Resultado="r" />
+                }
+            </section>
+        }
+    </main>
+
+    <footer>
+        <p>Este relatório só mostra: não executa nada. Toda correção é feita no terminal e pede confirmação antes (por exemplo, <code>triage corrigir temporarios</code>).</p>
+        <p>Gerado no próprio PC, sem internet. Nenhum dado saiu daqui.</p>
+    </footer>
+</body>
+</html>
+
+@code {
+    [Parameter, EditorRequired] public Revisao Revisao { get; set; } = default!;
+    [Parameter, EditorRequired] public string Versao { get; set; } = default!;
+
+    private static readonly Gravidade[] OrdemDaContagem =
+        [Gravidade.Critico, Gravidade.Atencao, Gravidade.Ok, Gravidade.Pulado, Gravidade.NaoSeAplica];
+
+    // A ordem das seções segue a P18: o que precisa de ação primeiro
+    private static readonly (string Titulo, Gravidade[] Gravidades)[] Grupos =
+    [
+        ("Precisa de atenção", [Gravidade.Critico, Gravidade.Atencao]),
+        ("Não deu para verificar", [Gravidade.Pulado]),
+        ("Tudo certo", [Gravidade.Ok]),
+        ("Não se aplica a este PC", [Gravidade.NaoSeAplica]),
+    ];
+
+    private string Data => Revisao.FeitaEm.ToString("dd/MM/yyyy 'às' HH:mm", Textos.Cultura);
+
+    private int Quantos(Gravidade g) => Revisao.Resultados.Count(r => r.Avaliacao.Gravidade == g);
+
+    internal static string Classe(Gravidade g) => g switch
+    {
+        Gravidade.Critico => "critico",
+        Gravidade.Atencao => "atencao",
+        Gravidade.Ok => "ok",
+        Gravidade.Pulado => "pulado",
+        _ => "na",
+    };
+}
