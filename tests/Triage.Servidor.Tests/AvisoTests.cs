@@ -357,7 +357,7 @@ public sealed class EnviadorDeAvisosTests(ServidorDeTeste servidor)
     public async Task Token_do_Telegram_nao_aparece_em_nenhum_log()
     {
         // Achado do revisor: o HttpClient escreve no log a URL de cada pedido, e a do Telegram leva o token
-        const string token = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw1";
+        var token = TokenFalso;
         var log = new LogCaptado();
         await using var fabrica = servidor.Com(s =>
         {
@@ -372,7 +372,7 @@ public sealed class EnviadorDeAvisosTests(ServidorDeTeste servidor)
         await escopo.ServiceProvider.GetRequiredService<IMensageiro>().Enviar("oi", Cancelar);
 
         Assert.Contains(log.Linhas, l => l.Contains("System.Net.Http") || l.Contains("Microsoft")); // o log estava ligado
-        Assert.DoesNotContain(log.Linhas, l => l.Contains("AAHdq"));
+        Assert.DoesNotContain(log.Linhas, l => l.Contains(TokenFalso[10..]));
     }
 
     [Fact]
@@ -389,14 +389,20 @@ public sealed class EnviadorDeAvisosTests(ServidorDeTeste servidor)
     }
 
     [Theory]
-    [InlineData("123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw1", true)]
     [InlineData("123456789:curto", false)]
     [InlineData("nao-e-token", false)]
     [InlineData(null, false)]
     public void Token_so_com_o_formato_do_BotFather(string? token, bool valido)
     {
         Assert.Equal(valido, MensageiroDoTelegram.TokenValido(token));
+        Assert.True(MensageiroDoTelegram.TokenValido(TokenFalso));
     }
+
+    /// <summary>
+    /// Um token com o formato do BotFather, montado aqui e não escrito por inteiro: escrito, o scanner de segredos do
+    /// GitHub o confunde com um token de verdade (aconteceu no 9e72c5b; era o exemplo da documentação do Telegram).
+    /// </summary>
+    private static readonly string TokenFalso = "123456789" + ":" + new string('x', 35);
 
     private sealed class TelegramFalso(HttpStatusCode codigo) : HttpMessageHandler
     {
@@ -414,7 +420,7 @@ public sealed class EnviadorDeAvisosTests(ServidorDeTeste servidor)
     [Fact]
     public async Task Mensageiro_chama_a_API_do_Telegram_e_nao_vaza_o_token_no_erro()
     {
-        const string token = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw1";
+        var token = TokenFalso;
         var ok = new TelegramFalso(HttpStatusCode.OK);
         await new MensageiroDoTelegram(new HttpClient(ok), token, "42").Enviar("oi", Cancelar);
 
@@ -424,6 +430,6 @@ public sealed class EnviadorDeAvisosTests(ServidorDeTeste servidor)
 
         var erro = await Assert.ThrowsAsync<HttpRequestException>(() =>
             new MensageiroDoTelegram(new HttpClient(new TelegramFalso(HttpStatusCode.Unauthorized)), token, "42").Enviar("oi", Cancelar));
-        Assert.DoesNotContain("AAHdq", erro.Message);
+        Assert.DoesNotContain(TokenFalso[10..], erro.Message);
     }
 }
