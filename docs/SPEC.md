@@ -236,8 +236,9 @@ README atualizado. Uma sessão nova por fase, começando por este arquivo.
 >   atalho da pasta Inicializar entra como "atalho na pasta Inicializar" (é nome de arquivo); do registro fica o nome
 >   que o programa registrou. Desligamento inesperado não conta o Kernel-Power 41 que vem com `BugcheckCode` (esse é
 >   tela azul). Código 22 (desativado) e 45 (desconectado) não são driver com erro.
-> - **Pendente:** (1) os valores `01` e `05` do `StartupApproved` no notebook (Docker, Discord, Spotify, Chrome = 01;
->   SecurityHealth = 05) caem em "ímpar = desligado"; nenhuma fonte explica, conferir com o Gerenciador de Tarefas dele;
+> - **Pendente:** (1) ~~os valores `01` e `05` do `StartupApproved` no notebook (Docker, Discord, Spotify, Chrome = 01;
+>   SecurityHealth = 05) caem em "ímpar = desligado"; nenhuma fonte explica, conferir com o Gerenciador de Tarefas dele;~~ **resolvida 31/10:** o Gerenciador mostra os cinco
+>   "Desabilitado" e o registro tinha 03 (os quatro) e 07 (SecurityHealth): bate com "ímpar = desligado";
 >   (2) firewall lê a configuração local, não a efetiva (política de grupo): usar `HNetCfg.FwPolicy2` ou `ActiveStore`;
 >   (3) serviço do Windows Update desativado (0x80070422) sai "pulado: erro", mas é o problema a mostrar (atenção);
 >   (4) as regras de pulo do antivírus e do firewall estão no leitor do Windows, sem teste: levar para função pura;

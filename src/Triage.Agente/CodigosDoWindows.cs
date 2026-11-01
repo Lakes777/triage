@@ -15,8 +15,9 @@ public static class CodigosDoWindows
 
     /// <summary>
     /// O Gerenciador de Tarefas desliga um programa da inicialização sem apagá-lo: grava um valor binário em
-    /// <c>Explorer\StartupApproved</c> com o mesmo nome. Primeiro byte ímpar (0x03, 0x01) = desligado; par (0x02,
-    /// 0x06) ou sem valor = ligado.
+    /// <c>Explorer\StartupApproved</c> com o mesmo nome. Primeiro byte ímpar (0x03, 0x07, 0x01) = desligado; par
+    /// (0x02, 0x06) ou sem valor = ligado. Conferido em 31/10/2026 no Gerenciador de Tarefas do notebook: os quatro
+    /// com 0x03 e o SecurityHealth com 0x07 aparecem "Desabilitado".
     /// </summary>
     public static bool InicializacaoLigada(byte[]? aprovacao) => aprovacao is not { Length: > 0 } || aprovacao[0] % 2 == 0;
 
