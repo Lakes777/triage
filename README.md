@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/Lakes777/triage/actions/workflows/ci.yml/badge.svg)](https://github.com/Lakes777/triage/actions/workflows/ci.yml)
 
-> Em construção: fase 6 de 10 (agente completo; servidor com inscrição e recebimento de revisões). O plano inteiro está em [docs/SPEC.md](docs/SPEC.md).
+> Em construção: fase 7 de 10 (agente completo, com envio opcional ao servidor; servidor recebendo revisões). O plano inteiro está em [docs/SPEC.md](docs/SPEC.md).
 
 Um agente que roda no computador, confere o que costuma dar problema (disco gastando, espaço acabando,
 bateria cansada, atualizações paradas, telas azuis, Defender desligado...) e gera um relatório com o que é,
@@ -86,8 +86,22 @@ arquivo em uso fica e é contado. `triage corrigir temporarios`, `lixeira` ou `c
 administrador: para o Windows Update durante a limpeza e religa depois) fazem uma de cada vez. Tudo fica anotado em
 `%LOCALAPPDATA%\Triage\correcoes.jsonl` (o que fez e quanto liberou, sem nome de arquivo).
 
+### Servidor (opcional)
+
+```
+> triage inscrever 7K2M-9QXA-4TRW notebook da sala
+Inscrito como "notebook da sala". As próximas revisões vão também para https://triage.andrelagos.dev/.
+```
+
+O servidor `triage.andrelagos.dev` entra no ar na fase 10 (até lá, só com `--servidor` apontando para um servidor
+local). O código vem do administrador do servidor e vale uma vez, por 24 h. Depois disso, cada `triage revisar` também
+manda a revisão (só medidas e nomes de programas desatualizados). Sem internet ela fica numa fila e sobe na próxima
+vez, ou com `triage enviar`; o servidor nunca grava a mesma revisão duas vezes. A chave da máquina fica protegida
+pelo Windows (DPAPI): copiada para outro PC ou outra conta, não abre. `triage desinscrever` desliga este PC.
+
 `triage agendar` põe uma revisão toda segunda às 12h no Agendador de Tarefas (roda ao ligar se o PC estava
-desligado); ela só revisa e guarda o relatório, nunca corrige. `triage desagendar` tira.
+desligado); ela revisa e guarda o relatório (e, se o PC estiver inscrito num servidor, manda a revisão para lá),
+nunca corrige. `triage desagendar` tira.
 
 As verificações nunca leem o Windows direto: recebem uma "foto" do sistema. No `.exe` a foto vem do Windows
 (WMI, `powercfg`, API da lixeira); nos testes, de leituras gravadas de PCs de verdade com `triage gravar`

@@ -12,7 +12,14 @@ namespace Triage.Servidor;
 public sealed class TriagemServico(Inscricoes inscricoes, Envios envios) : Triagem.TriagemBase
 {
     public const string CabecalhoDaMaquina = "triage-maquina";
-    public const string CabecalhoDaChave = "triage-chave";
+
+    /// <summary>A chave vai no Authorization (Bearer): o log de acesso do Caddy esconde esse cabeçalho.</summary>
+    public const string CabecalhoDaChave = "authorization";
+
+    private static string? Chave(Metadata cabecalhos) =>
+        cabecalhos.GetValue(CabecalhoDaChave) is { } valor && valor.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? valor["Bearer ".Length..].Trim()
+            : null;
 
     public override Task<VersaoResposta> Versao(VersaoPedido pedido, ServerCallContext contexto) =>
         Task.FromResult(new VersaoResposta { VersaoDoServidor = VersaoDoTriage.Atual });
@@ -37,7 +44,7 @@ public sealed class TriagemServico(Inscricoes inscricoes, Envios envios) : Triag
         try
         {
             var gravou = await envios.Gravar(contexto.RequestHeaders.GetValue(CabecalhoDaMaquina),
-                contexto.RequestHeaders.GetValue(CabecalhoDaChave), pedido, contexto.CancellationToken);
+                Chave(contexto.RequestHeaders), pedido, contexto.CancellationToken);
             return new EnviarRevisaoResposta { GravadaAgora = gravou };
         }
         catch (EnvioRecusado recusa)

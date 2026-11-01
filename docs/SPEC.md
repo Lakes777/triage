@@ -350,6 +350,32 @@ README atualizado. Uma sessão nova por fase, começando por este arquivo.
 >   Caddy), aceitando o cabeçalho só da rede do Caddy (`KnownIPNetworks`, como no Beacon), senão ele é forjado;
 >   e repetir o `deploy/separar-papeis.sh` do Beacon para o banco `triage`.
 
+> 01/11/2026 (fase 7, decidido ao fazer):
+> - **Inscrição local:** `triage inscrever <código> <apelido>` (apelido com espaços sem aspas; `--servidor <url>`
+>   opcional, padrão `https://triage.andrelagos.dev`; `http://` só para localhost, senão a chave iria aberta).
+>   Grava `inscricao.json` (servidor, id, apelido; sem segredo) e `chave` protegida com DPAPI do usuário, com
+>   entropia própria. Inscrever de novo é recusado (deixaria máquina órfã no servidor): antes, `triage desinscrever`,
+>   que apaga chave e fila daqui (revogar no servidor continua com o administrador).
+> - **Fila:** `fila/<id>.revisao` com os **bytes do pedido** (nota da fase 6); grava em `.gravando` e renomeia; sai
+>   na ordem do id (UUID v7 a partir do `feita_em`); teto de 50 (as mais antigas saem). Só sai depois da resposta do
+>   servidor (contraprova: tirar antes quebra 6 testes). Entregue/já gravada = sai; recusada (inválida ou mesmo id
+>   com outro conteúdo) = sai e é mostrada; sem permissão = para e guarda; sem rede/limite/erro do servidor = para e
+>   guarda (na dúvida a revisão fica: o servidor não grava duas vezes). Arquivo estragado sai.
+> - **No `revisar`:** inscrito, a revisão entra na fila e a fila é esvaziada (prazo de 15 s por chamada); qualquer
+>   problema de envio é aviso e não muda o código de saída (o envio é opcional, P25). `--leitura` nunca envia (não
+>   é este PC agora). Sem inscrição, nada de rede.
+> - **Ponta a ponta:** `AgenteComServidorTests` roda o agente de verdade (comandos, fila, cliente gRPC) contra o
+>   servidor de verdade e o Postgres, com uma "rede" que cai: sem rede fica na fila e sobe depois; mesma revisão
+>   2x = 1 gravação; mesmo id com outro conteúdo = recusado e a original fica; revogada = aviso e fila guardada.
+> - **Revisor (corrigido):** (1) chave que a DPAPI não abre mais (senha da conta redefinida, perfil em outro PC) ou
+>   `inscricao.json` estragado levavam a um beco sem saída: agora toda mensagem aponta `triage desinscrever` e a
+>   fila não enche à toa; (2) duas execuções ao mesmo tempo (agendada + duplo clique): trava `fila/.trava`
+>   (`FileShare.None`), e arquivo que some no meio não interrompe as outras; (3) faltava teste de exceção no envio
+>   (trocar o `catch` não quebrava nada); (4) a chave ia num cabeçalho próprio, que o log do Caddy gravaria: agora
+>   vai em `authorization: Bearer`, que o Caddy esconde; (5) a tarefa semanal agora avisa que também envia; (6)
+>   servidor aceitou o código mas a chave não gravou: a mensagem diz que o código foi gasto e qual máquina revogar;
+>   (7) `--servidor` sem valor virava parte do apelido.
+
 Boas para subagentes (em worktree):
 
 - **Fases 2 e 3:** cada verificação é uma classe sem dependência das outras, lendo só pela

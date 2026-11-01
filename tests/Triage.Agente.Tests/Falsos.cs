@@ -1,4 +1,6 @@
+using Grpc.Core;
 using Triage.Agente;
+using Triage.Contratos.Grpc;
 using Triage.Verificacoes;
 
 namespace Triage.Agente.Tests;
@@ -76,4 +78,53 @@ public sealed class AgendadorFalso : IAgendador
     public void Criar(string nome, string xml) => Tarefas[nome] = xml;
 
     public bool Apagar(string nome) => Tarefas.Remove(nome);
+}
+
+/// <summary>"Protege" invertendo os bytes: o arquivo gravado nunca é a chave em claro, e dá para conferir isso.</summary>
+public sealed class CofreFalso : ICofre
+{
+    public byte[] Proteger(string segredo) => System.Text.Encoding.UTF8.GetBytes(segredo).Reverse().ToArray();
+    public string Abrir(byte[] protegido) => System.Text.Encoding.UTF8.GetString(protegido.Reverse().ToArray());
+}
+
+/// <summary>Um servidor de mentira: guarda o que recebeu e responde o que o teste mandar.</summary>
+public sealed class ServidorFalso : IServidorDoTriage
+{
+    public List<EnviarRevisaoPedido> Recebidos { get; } = [];
+    public List<(string Maquina, string Chave)> Credenciais { get; } = [];
+    public Queue<Envio> Respostas { get; } = new();
+    public Envio Padrao { get; set; } = new(RespostaDoEnvio.Entregue);
+    public RpcException? ErroNaInscricao { get; set; }
+    public Exception? ErroNoEnvio { get; set; }
+
+    /// <summary>Roda no meio do envio: simula outra execução mexendo na fila ao mesmo tempo.</summary>
+    public Action? AoEnviar { get; set; }
+    public List<Uri> Enderecos { get; } = [];
+
+    public Task<(string MaquinaId, string Chave)> Inscrever(string codigo, string apelido, CancellationToken cancelar) =>
+        ErroNaInscricao is { } erro
+            ? throw erro
+            : Task.FromResult(("0193f0c4-0000-7000-8000-000000000001", "chave-secreta-da-maquina"));
+
+    public Task<Envio> Enviar(EnviarRevisaoPedido pedido, string maquinaId, string chave, CancellationToken cancelar)
+    {
+        if (ErroNoEnvio is { } erro)
+            throw erro;
+        AoEnviar?.Invoke();
+        Credenciais.Add((maquinaId, chave));
+        var resposta = Respostas.Count > 0 ? Respostas.Dequeue() : Padrao;
+        if (resposta.Resposta == RespostaDoEnvio.Entregue)
+            Recebidos.Add(pedido);
+        return Task.FromResult(resposta);
+    }
+}
+
+/// <summary>A DPAPI que não abre mais (senha da conta redefinida, perfil em outro PC) ou que nem grava.</summary>
+public sealed class CofreQuebrado(bool tambemNaoGrava = false) : ICofre
+{
+    public byte[] Proteger(string segredo) =>
+        tambemNaoGrava ? throw new System.Security.Cryptography.CryptographicException("DPAPI indisponível") : [1, 2, 3];
+
+    public string Abrir(byte[] protegido) =>
+        throw new System.Security.Cryptography.CryptographicException("Key not valid for use in specified state.");
 }

@@ -34,5 +34,7 @@ var windows = new AcessoAoWindows(
     () => OperatingSystem.IsWindows() ? new AgendadorDoWindows() : null,
     AbrirNoNavegador,
     Environment.ProcessPath,
-    TimeProvider.System);
+    TimeProvider.System,
+    () => OperatingSystem.IsWindows() ? new CofreDoWindows() : null,
+    endereco => ServidorGrpc.Conectar(endereco));
 return new Comandos(Console.In, Console.Out, Console.Error, pastaDoTriage, windows).Executar(args);

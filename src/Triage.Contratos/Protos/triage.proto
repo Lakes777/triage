@@ -15,7 +15,7 @@ service Triagem {
   // Troca um código de inscrição (uso único, 24 h, gerado pelo administrador) pela chave da máquina.
   rpc Inscrever (InscreverPedido) returns (InscreverResposta);
 
-  // Manda uma revisão. Pede os metadados "triage-maquina" e "triage-chave". O id nasce no agente: mandar a
+  // Manda uma revisão. Pede os metadados "triage-maquina" e "authorization: Bearer <chave>". O id nasce no agente: mandar a
   // mesma revisão de novo é sucesso sem gravar outra vez; o mesmo id com outro conteúdo é erro (ALREADY_EXISTS).
   rpc EnviarRevisao (EnviarRevisaoPedido) returns (EnviarRevisaoResposta);
 }

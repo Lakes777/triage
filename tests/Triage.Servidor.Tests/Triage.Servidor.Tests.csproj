@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Triage.Servidor\Triage.Servidor.csproj" />
+    <!-- O agente de verdade (comandos, fila, cliente gRPC) contra este servidor: a prova de ponta a ponta da fase 7 -->
+    <ProjectReference Include="..\..\src\Triage.Agente\Triage.Agente.csproj" />
   </ItemGroup>
 
   <ItemGroup>

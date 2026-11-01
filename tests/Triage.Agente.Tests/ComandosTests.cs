@@ -37,7 +37,16 @@ public sealed class ComandosTests : IDisposable
         () => foraDoWindows ? null : agendador,
         Abrir,
         executavel,
-        Domingo);
+        Domingo,
+        () => foraDoWindows ? null : cofre,
+        endereco =>
+        {
+            servidor.Enderecos.Add(endereco);
+            return servidor;
+        });
+
+    private readonly ServidorFalso servidor = new();
+    private ICofre cofre = new CofreFalso();
 
     private sealed class FakeRelogio(DateTimeOffset agora) : TimeProvider
     {
@@ -446,6 +455,241 @@ public sealed class ComandosTests : IDisposable
         Assert.Empty(agendador.Tarefas);
         Assert.Contains("removida", primeira.Saida);
         Assert.Contains("Não havia", segunda.Saida);
+    }
+
+    private FilaDeEnvios Fila => new(pasta);
+
+    private void Inscrito() => Rodar(["inscrever", "7K2M-9QXA-4TRW", "notebook", "da", "sala"]);
+
+    [Fact]
+    public void Inscrever_guarda_a_inscricao_e_a_chave_protegida()
+    {
+        var r = Rodar(["inscrever", "7K2M-9QXA-4TRW", "notebook", "da", "sala"]);
+
+        Assert.Equal(Comandos.Sucesso, r.Codigo);
+        Assert.Contains("Inscrito como \"notebook da sala\"", r.Saida);
+        Assert.Equal([new Uri(Comandos.ServidorPadrao)], servidor.Enderecos);
+        var (inscricao, chave) = new ArquivosDaInscricao(pasta, new CofreFalso()).Ler()!.Value;
+        Assert.Equal("notebook da sala", inscricao.Apelido);
+        Assert.Equal("chave-secreta-da-maquina", chave);
+    }
+
+    [Fact]
+    public void Inscrever_com_outro_servidor()
+    {
+        Rodar(["inscrever", "--servidor", "http://localhost:8081", "7K2M-9QXA-4TRW", "pc"]);
+
+        Assert.Equal([new Uri("http://localhost:8081")], servidor.Enderecos);
+    }
+
+    [Theory]
+    [InlineData("http://triage.andrelagos.dev")] // a chave iria aberta pela rede
+    [InlineData("ftp://localhost")]
+    [InlineData("nao e endereco")]
+    public void Inscrever_recusa_endereco_sem_https(string endereco)
+    {
+        var r = Rodar(["inscrever", "--servidor", endereco, "7K2M-9QXA-4TRW", "pc"]);
+
+        Assert.Equal(Comandos.UsoErrado, r.Codigo);
+        Assert.Empty(servidor.Enderecos);
+    }
+
+    [Fact]
+    public void Inscrever_de_novo_e_recusado_para_nao_deixar_maquina_orfa()
+    {
+        Inscrito();
+
+        var r = Rodar(["inscrever", "AAAA-BBBB-CCCC", "outro"]);
+
+        Assert.Equal(Comandos.Falha, r.Codigo);
+        Assert.Contains("já está inscrito como \"notebook da sala\"", r.Erros);
+        Assert.Single(servidor.Enderecos);
+    }
+
+    [Fact]
+    public void Codigo_recusado_mostra_a_mensagem_do_servidor_e_nao_inscreve()
+    {
+        servidor.ErroNaInscricao = new Grpc.Core.RpcException(new Grpc.Core.Status(
+            Grpc.Core.StatusCode.InvalidArgument, "Código inválido, já usado ou vencido."));
+
+        var r = Rodar(["inscrever", "AAAA-BBBB-CCCC", "pc"]);
+
+        Assert.Equal(Comandos.Falha, r.Codigo);
+        Assert.Contains("Código inválido, já usado ou vencido.", r.Erros);
+        Assert.False(new ArquivosDaInscricao(pasta, new CofreFalso()).Inscrito);
+    }
+
+    [Fact]
+    public void Sem_inscricao_o_revisar_nao_manda_nada()
+    {
+        Rodar(["revisar", "--sem-abrir"]);
+
+        Assert.Empty(servidor.Enderecos);
+        Assert.Empty(Fila.Pendentes());
+    }
+
+    [Fact]
+    public void Inscrito_o_revisar_manda_ao_servidor()
+    {
+        Inscrito();
+
+        var r = Rodar(["revisar", "--sem-abrir"]);
+
+        Assert.Equal(Comandos.Sucesso, r.Codigo);
+        Assert.Contains("Enviada(s) ao servidor: 1", r.Saida);
+        Assert.Single(servidor.Recebidos);
+        Assert.Empty(Fila.Pendentes());
+    }
+
+    [Fact]
+    public void Sem_rede_a_revisao_fica_na_fila_e_sobe_depois()
+    {
+        // Critério da fase 7: sem rede a revisão fica na fila e sobe depois
+        Inscrito();
+        servidor.Padrao = new Envio(RespostaDoEnvio.TentarDepois, "sem rede");
+
+        var semRede = Rodar(["revisar", "--sem-abrir"]);
+        servidor.Padrao = new Envio(RespostaDoEnvio.Entregue);
+        var depois = Rodar(["enviar"]);
+
+        Assert.Equal(Comandos.Sucesso, semRede.Codigo); // a revisão local deu certo
+        Assert.Contains("Sem conexão com o servidor agora (sem rede): 1 revisão(ões) na fila", semRede.Saida);
+        Assert.Equal(Comandos.Sucesso, depois.Codigo);
+        Assert.Single(servidor.Recebidos);
+        Assert.Empty(Fila.Pendentes());
+    }
+
+    [Fact]
+    public void Chave_revogada_avisa_e_deixa_a_fila()
+    {
+        Inscrito();
+        servidor.Padrao = new Envio(RespostaDoEnvio.SemPermissao, "Esta máquina foi revogada pelo administrador.");
+
+        var r = Rodar(["revisar", "--sem-abrir"]);
+
+        Assert.Equal(Comandos.Sucesso, r.Codigo);
+        Assert.Contains("foi revogada", r.Erros);
+        Assert.Single(Fila.Pendentes());
+    }
+
+    [Fact]
+    public void Excecao_no_envio_vira_aviso_e_a_revisao_fica_na_fila()
+    {
+        // Achado do revisor: sem este teste, trocar o catch do envio não quebrava nada
+        Inscrito();
+        servidor.ErroNoEnvio = new InvalidOperationException("algo inesperado");
+
+        var r = Rodar(["revisar", "--sem-abrir"]);
+
+        Assert.Equal(Comandos.Sucesso, r.Codigo);
+        Assert.Contains("Não deu para enviar agora (algo inesperado)", r.Saida);
+        Assert.Single(Fila.Pendentes());
+    }
+
+    [Fact]
+    public void Chave_que_nao_abre_mais_aponta_a_saida_em_todos_os_comandos()
+    {
+        Inscrito();
+        cofre = new CofreQuebrado();
+
+        var revisar = Rodar(["revisar", "--sem-abrir"]);
+        var enviar = Rodar(["enviar"]);
+        var inscrever = Rodar(["inscrever", "AAAA-BBBB-CCCC", "pc"]);
+        var desinscrever = Rodar(["desinscrever"]);
+
+        Assert.Equal(Comandos.Sucesso, revisar.Codigo); // a revisão local continua valendo
+        Assert.Contains("não abre mais", revisar.Erros);
+        Assert.Contains("triage desinscrever", revisar.Erros);
+        Assert.Empty(Fila.Pendentes()); // não enche a fila à toa
+        Assert.Equal(Comandos.Falha, enviar.Codigo);
+        Assert.Contains("triage desinscrever", enviar.Erros);
+        Assert.Contains("já está inscrito como \"notebook da sala\"", inscrever.Erros);
+        Assert.Equal(Comandos.Sucesso, desinscrever.Codigo); // a saída funciona
+    }
+
+    [Theory]
+    [InlineData("{ isto não é json")]
+    [InlineData("null")]
+    [InlineData("{}")]
+    public void Inscricao_json_estragado_tambem_aponta_a_saida(string conteudo)
+    {
+        Inscrito();
+        File.WriteAllText(Path.Combine(pasta, "inscricao.json"), conteudo);
+
+        var r = Rodar(["enviar"]);
+
+        Assert.Equal(Comandos.Falha, r.Codigo);
+        Assert.Contains("triage desinscrever", r.Erros);
+        Assert.Equal(Comandos.Sucesso, Rodar(["desinscrever"]).Codigo);
+    }
+
+    [Fact]
+    public void Chave_que_nao_grava_avisa_que_o_codigo_foi_gasto()
+    {
+        cofre = new CofreQuebrado(tambemNaoGrava: true);
+
+        var r = Rodar(["inscrever", "7K2M-9QXA-4TRW", "pc"]);
+
+        Assert.Equal(Comandos.Falha, r.Codigo);
+        Assert.Contains("O código já foi usado", r.Erros);
+        Assert.Contains("revogar a máquina 0193f0c4-0000-7000-8000-000000000001", r.Erros);
+    }
+
+    [Fact]
+    public void Servidor_sem_valor_e_erro_de_uso_e_nao_vira_apelido()
+    {
+        var r = Rodar(["inscrever", "7K2M-9QXA-4TRW", "pc", "--servidor"]);
+
+        Assert.Equal(Comandos.UsoErrado, r.Codigo);
+        Assert.Contains("Falta o endereço depois de --servidor", r.Erros);
+        Assert.Empty(servidor.Enderecos);
+    }
+
+    [Fact]
+    public void Leitura_gravada_nunca_vai_ao_servidor()
+    {
+        // Uma gravação não é este PC agora: mandar seria histórico falso
+        Inscrito();
+
+        Rodar(["revisar", "--leitura", Notebook, "--sem-abrir"]);
+
+        Assert.Empty(servidor.Recebidos);
+        Assert.Empty(Fila.Pendentes());
+    }
+
+    [Fact]
+    public void Enviar_sem_inscricao_explica()
+    {
+        var r = Rodar(["enviar"]);
+
+        Assert.Equal(Comandos.Falha, r.Codigo);
+        Assert.Contains("não está inscrito", r.Erros);
+    }
+
+    [Fact]
+    public void Desinscrever_apaga_chave_e_fila_daqui()
+    {
+        Inscrito();
+        servidor.Padrao = new Envio(RespostaDoEnvio.TentarDepois);
+        Rodar(["revisar", "--sem-abrir"]);
+
+        var r = Rodar(["desinscrever"]);
+
+        Assert.Contains("1 revisão(ões) que não tinham subido foram descartadas", r.Saida);
+        Assert.False(File.Exists(Path.Combine(pasta, "chave")));
+        Assert.Empty(Fila.Pendentes());
+        Assert.Equal(Comandos.Sucesso, Rodar(["inscrever", "AAAA-BBBB-CCCC", "de novo"]).Codigo);
+    }
+
+    [Theory]
+    [InlineData("https://triage.andrelagos.dev", true)]
+    [InlineData("http://localhost:8081", true)]
+    [InlineData("http://127.0.0.1:8081", true)]
+    [InlineData("http://triage.andrelagos.dev", false)]
+    [InlineData("http://192.168.0.10:8081", false)]
+    public void Endereco_aceito_so_com_https_ou_local(string endereco, bool aceito)
+    {
+        Assert.Equal(aceito, Comandos.EnderecoAceito(endereco, out _));
     }
 
     private sealed class LeitorQuebrado : ILeitorDoSistema

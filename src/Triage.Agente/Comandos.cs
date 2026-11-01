@@ -17,7 +17,9 @@ public sealed record AcessoAoWindows(
     Func<IAgendador?> Agendador,
     Func<string, bool> AbrirNoNavegador,
     string? Executavel,
-    TimeProvider Relogio);
+    TimeProvider Relogio,
+    Func<ICofre?> Cofre,
+    Func<Uri, IServidorDoTriage> Conectar);
 
 /// <summary>
 /// Entrada do terminal. Cada fase acrescenta o seu comando aqui (inscrever, enviar...).
@@ -30,6 +32,9 @@ public sealed class Comandos(
     public const int Sucesso = 0;
     public const int Falha = 1;
     public const int UsoErrado = 2;
+
+    /// <summary>O servidor de verdade (fase 10). Outro só com --servidor na inscrição.</summary>
+    public const string ServidorPadrao = "https://triage.andrelagos.dev";
 
     private const string Ajuda = """
         Triage: revisa este PC e diz o que fazer.
@@ -45,6 +50,9 @@ public sealed class Comandos(
           triage corrigir --seguras         faz as correções seguras de uma vez (uma pergunta só)
           triage agendar                    revisa toda segunda às 12h, pelo Agendador de Tarefas
           triage desagendar                 tira a revisão semanal
+          triage inscrever <código> <apelido>   liga este PC ao servidor (opcional; código do administrador)
+          triage enviar                     manda ao servidor as revisões que ficaram na fila
+          triage desinscrever               desliga este PC do servidor (apaga a chave e a fila daqui)
           triage --versao                   mostra a versão
           triage --ajuda                    mostra esta ajuda
         """;
@@ -92,6 +100,12 @@ public sealed class Comandos(
                 return Agendar();
             case ["desagendar"]:
                 return Desagendar();
+            case ["inscrever", .. var resto]:
+                return Inscrever(resto);
+            case ["enviar"]:
+                return Enviar();
+            case ["desinscrever"]:
+                return Desinscrever();
             case ["--versao"]:
                 saida.WriteLine($"triage {VersaoDoTriage.Atual}");
                 return Sucesso;
@@ -137,10 +151,11 @@ public sealed class Comandos(
             erros.WriteLine(Ajuda);
             return UsoErrado;
         }
-        return Revisar(leitura is null ? windows.Leitor() : new LeitorGravado(leitura), abrir);
+        // Uma leitura gravada não é este PC agora: nunca vai para o servidor
+        return Revisar(leitura is null ? windows.Leitor() : new LeitorGravado(leitura), abrir, enviar: leitura is null);
     }
 
-    private int Revisar(ILeitorDoSistema? leitor, bool abrir)
+    private int Revisar(ILeitorDoSistema? leitor, bool abrir, bool enviar = true)
     {
         if (leitor is null)
             return SoNoWindows();
@@ -154,7 +169,8 @@ public sealed class Comandos(
             erros.WriteLine($"O arquivo {ArquivoDeLimites} tem um erro: {erro.Message}");
             return Falha;
         }
-        var revisao = Motor.Padrao().Revisar(leitor.Ler(), limites);
+        var foto = leitor.Ler();
+        var revisao = Motor.Padrao().Revisar(foto, limites);
         SaidaEmTexto.Escrever(revisao, saida);
 
         var relatorio = GuardarRelatorio(revisao);
@@ -162,7 +178,184 @@ public sealed class Comandos(
         saida.WriteLine($"Relatório completo: {relatorio}");
         if (abrir && !windows.AbrirNoNavegador(relatorio))
             saida.WriteLine("Não deu para abrir o navegador: abra o arquivo acima.");
+        if (enviar)
+            EnviarAoFimDaRevisao(foto, revisao);
         return Sucesso;
+    }
+
+    /// <summary>
+    /// Inscrito: põe a revisão na fila e tenta esvaziar. Qualquer problema de envio vira aviso: a revisão local
+    /// já está pronta, e o envio é opcional (P25).
+    /// </summary>
+    private void EnviarAoFimDaRevisao(FotoDoSistema foto, Revisao revisao)
+    {
+        if (windows.Cofre() is not { } cofre || !new ArquivosDaInscricao(pastaDoTriage, cofre).Inscrito)
+            return;
+        saida.WriteLine();
+        try
+        {
+            // A chave primeiro: se ela não abre, nem adianta encher a fila
+            var (inscricao, chave) = new ArquivosDaInscricao(pastaDoTriage, cofre).Ler()!.Value;
+            new FilaDeEnvios(pastaDoTriage).Guardar(PedidoDeEnvio.Montar(foto, revisao));
+            // O duplo clique fica parado esperando a rede (até 15 s): melhor dizer o que está acontecendo
+            saida.WriteLine("Enviando ao servidor...");
+            EsvaziarFila(inscricao, chave);
+        }
+        catch (InscricaoEstragada erro)
+        {
+            erros.WriteLine(erro.Message);
+        }
+        catch (Exception erro)
+        {
+            saida.WriteLine($"Não deu para enviar agora ({erro.Message}): a revisão ficou na fila (triage enviar).");
+        }
+    }
+
+    private int Inscrever(string[] resto)
+    {
+        var servidor = ServidorPadrao;
+        var partes = new List<string>();
+        for (var i = 0; i < resto.Length; i++)
+        {
+            if (resto[i] != "--servidor")
+                partes.Add(resto[i]);
+            else if (i + 1 < resto.Length && !resto[i + 1].StartsWith("--", StringComparison.Ordinal))
+                servidor = resto[++i];
+            else
+            {
+                // Sem isto, "triage inscrever CODIGO pc --servidor" virava o apelido "pc --servidor"
+                erros.WriteLine("Falta o endereço depois de --servidor.");
+                return UsoErrado;
+            }
+        }
+        // O apelido pode ter espaços sem aspas: triage inscrever 7K2M-9QXA-4TRW notebook da sala
+        if (partes.Count < 2)
+        {
+            erros.WriteLine("Uso: triage inscrever <código> <apelido> (o código vem do administrador do servidor)");
+            return UsoErrado;
+        }
+        if (!EnderecoAceito(servidor, out var endereco))
+        {
+            erros.WriteLine($"Endereço do servidor inválido: {servidor}. Use https:// (http:// só para localhost).");
+            return UsoErrado;
+        }
+        if (windows.Cofre() is not { } cofre)
+            return SoNoWindows();
+        var arquivos = new ArquivosDaInscricao(pastaDoTriage, cofre);
+        if (arquivos.Inscrito)
+        {
+            // Inscrever de novo cria outra máquina no servidor e deixa a antiga órfã: só de propósito. Lê só os
+            // dados (sem abrir a chave): com a chave estragada, a mensagem ainda aponta a saída
+            var atual = arquivos.LerDados()!;
+            erros.WriteLine($"Este PC já está inscrito como \"{atual.Apelido}\" em {atual.Servidor}. " +
+                "Para inscrever de novo, rode triage desinscrever antes.");
+            return Falha;
+        }
+
+        var apelido = string.Join(' ', partes.Skip(1));
+        string maquina, chave;
+        try
+        {
+            (maquina, chave) = windows.Conectar(endereco).Inscrever(partes[0], apelido, CancellationToken.None)
+                .GetAwaiter().GetResult();
+        }
+        catch (Grpc.Core.RpcException erro)
+        {
+            erros.WriteLine(erro.StatusCode is Grpc.Core.StatusCode.InvalidArgument
+                ? erro.Status.Detail
+                : $"Não deu para falar com o servidor em {endereco} ({erro.StatusCode}: {erro.Status.Detail}). Confira a " +
+                  "internet e tente de novo. Se a resposta se perdeu no caminho, o código pode já ter sido usado: aí peça outro.");
+            return Falha;
+        }
+        try
+        {
+            arquivos.Gravar(new Inscricao(endereco.ToString(), maquina, apelido), chave);
+        }
+        catch (Exception erro)
+        {
+            // O servidor já criou a máquina e o código foi gasto: sem isto, ficaria só um "Erro:" sem saída
+            erros.WriteLine($"O servidor aceitou o código, mas não deu para guardar a chave neste PC ({erro.Message}). " +
+                $"O código já foi usado: peça outro, e peça ao administrador para revogar a máquina {maquina}.");
+            return Falha;
+        }
+        saida.WriteLine($"Inscrito como \"{apelido}\". As próximas revisões vão também para {endereco}.");
+        saida.WriteLine("Vão só medidas e nomes de programas desatualizados: nunca arquivo, pasta ou nome de usuário.");
+        return Sucesso;
+    }
+
+    private int Enviar()
+    {
+        if (windows.Cofre() is not { } cofre)
+            return SoNoWindows();
+        if (!new ArquivosDaInscricao(pastaDoTriage, cofre).Inscrito)
+        {
+            erros.WriteLine("Este PC não está inscrito em nenhum servidor (triage inscrever <código> <apelido>).");
+            return Falha;
+        }
+        // A chave antes da fila: com ela estragada, o "enviar" é o lugar de descobrir (e a mensagem aponta a saída)
+        var (inscricao, chave) = new ArquivosDaInscricao(pastaDoTriage, cofre).Ler()!.Value;
+        if (new FilaDeEnvios(pastaDoTriage).Pendentes().Count == 0)
+        {
+            saida.WriteLine("Nada na fila para enviar.");
+            return Sucesso;
+        }
+        return EsvaziarFila(inscricao, chave) is null ? Sucesso : Falha;
+    }
+
+    /// <summary>Esvazia a fila e conta no terminal. Devolve por que parou (nulo = esvaziou).</summary>
+    private RespostaDoEnvio? EsvaziarFila(Inscricao inscricao, string chave)
+    {
+        var enviador = new Enviador(new FilaDeEnvios(pastaDoTriage), windows.Conectar(new Uri(inscricao.Servidor)),
+            inscricao, chave);
+        var r = enviador.EsvaziarFila().GetAwaiter().GetResult();
+        if (r.Entregues > 0)
+            saida.WriteLine($"Enviada(s) ao servidor: {r.Entregues} revisão(ões).");
+        foreach (var motivo in r.Recusadas)
+            erros.WriteLine($"Revisão recusada pelo servidor e tirada da fila: {motivo}");
+        switch (r.Parou)
+        {
+            case RespostaDoEnvio.SemPermissao:
+                erros.WriteLine($"O servidor recusou a chave deste PC ({r.Detalhe}). Se ele foi revogado, peça um código " +
+                    $"novo e rode triage desinscrever e triage inscrever. {r.Restantes} revisão(ões) na fila.");
+                break;
+            case RespostaDoEnvio.TentarDepois:
+                saida.WriteLine($"Sem conexão com o servidor agora ({r.Detalhe}): {r.Restantes} revisão(ões) na fila, " +
+                    "que sobem na próxima revisão (ou com triage enviar).");
+                break;
+        }
+        return r.Parou;
+    }
+
+    private int Desinscrever()
+    {
+        if (windows.Cofre() is not { } cofre)
+            return SoNoWindows();
+        var arquivos = new ArquivosDaInscricao(pastaDoTriage, cofre);
+        if (!arquivos.Inscrito)
+        {
+            saida.WriteLine("Este PC não estava inscrito.");
+            return Sucesso;
+        }
+        var fila = new FilaDeEnvios(pastaDoTriage);
+        var pendentes = fila.Pendentes().Count;
+        arquivos.Apagar();
+        fila.Esvaziar();
+        saida.WriteLine("Inscrição apagada deste PC (chave e fila). No servidor, o administrador pode revogar a máquina antiga." +
+            (pendentes > 0 ? $" {pendentes} revisão(ões) que não tinham subido foram descartadas." : ""));
+        return Sucesso;
+    }
+
+    /// <summary>https sempre; http só para um servidor na própria máquina (a chave viajaria aberta pela rede).</summary>
+    public static bool EnderecoAceito(string texto, out Uri endereco)
+    {
+        endereco = null!;
+        if (!Uri.TryCreate(texto, UriKind.Absolute, out var uri))
+            return false;
+        var local = uri.IsLoopback;
+        if (uri.Scheme != Uri.UriSchemeHttps && !(uri.Scheme == Uri.UriSchemeHttp && local))
+            return false;
+        endereco = uri;
+        return true;
     }
 
     private string GuardarRelatorio(Revisao revisao)
@@ -238,7 +431,8 @@ public sealed class Comandos(
         agendador.Criar(TarefaSemanal.Nome, TarefaSemanal.Xml(exe, proxima));
         saida.WriteLine($"Agendado: revisão toda segunda às {TarefaSemanal.Hora:HH\\:mm}, a próxima em " +
             $"{proxima.ToString("dd/MM/yyyy", Textos.Cultura)}. Se o PC estiver desligado, roda assim que ligar.");
-        saida.WriteLine($"Ela só revisa e guarda o relatório em {Path.Combine(pastaDoTriage, "relatorios")}: nunca corrige nada.");
+        saida.WriteLine($"Ela revisa e guarda o relatório em {Path.Combine(pastaDoTriage, "relatorios")} (e, se este PC " +
+            "estiver inscrito num servidor, manda a revisão para lá): nunca corrige nada.");
         saida.WriteLine($"Usa este arquivo: {exe}. Se mover o triage.exe, rode triage agendar de novo.");
         return Sucesso;
     }
@@ -260,7 +454,8 @@ public sealed class Comandos(
 
     private int SoNoWindows()
     {
-        erros.WriteLine("Ler este PC só funciona no Windows. Fora dele: triage revisar --leitura <arquivo.json>");
+        erros.WriteLine("Isto só funciona no Windows. Fora dele, dá para revisar uma leitura gravada: " +
+            "triage revisar --leitura <arquivo.json>");
         return Falha;
     }
 }

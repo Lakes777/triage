@@ -51,7 +51,7 @@ public sealed class ServidorDeTeste : WebApplicationFactory<Program>, IAsyncLife
     public Triagem.TriagemClient Cliente() => Cliente(this);
 
     public static Metadata Credenciais(string maquina, string chave) =>
-        new() { { TriagemServico.CabecalhoDaMaquina, maquina }, { TriagemServico.CabecalhoDaChave, chave } };
+        new() { { TriagemServico.CabecalhoDaMaquina, maquina }, { TriagemServico.CabecalhoDaChave, $"Bearer {chave}" } };
 
     /// <summary>Roda algo com as regras e o banco direto, como os comandos do administrador fazem.</summary>
     public async Task<T> NoBanco<T>(Func<Inscricoes, TriageContexto, Task<T>> acao)
