@@ -10,7 +10,8 @@ namespace Triage.Agente;
 /// </summary>
 public static class TarefaSemanal
 {
-    public const string Nome = @"\Triage\Revisao semanal";
+    // Na raiz do Agendador: o schtasks /Delete tira a tarefa mas deixaria uma pasta \Triage vazia (visto no notebook)
+    public const string Nome = @"\Triage - Revisao semanal";
     public const DayOfWeek Dia = DayOfWeek.Monday;
     public static readonly TimeOnly Hora = new(12, 0);
 

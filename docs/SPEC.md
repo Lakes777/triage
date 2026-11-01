@@ -301,7 +301,12 @@ README atualizado. Uma sessão nova por fase, começando por este arquivo.
 > - **Agendamento:** `schtasks /Create /XML` (o XML dá `StartWhenAvailable` e rodar na bateria, que a linha de
 >   comando não dá), toda segunda 12h, `InteractiveToken` + `LeastPrivilege` (sem senha guardada, sem admin),
 >   ação `triage.exe revisar --sem-abrir`. Recusa agendar pelo `dotnet run` (chamaria o dotnet.exe); outro nome de
->   `.exe` vale. **Falta provar** agendar sem admin (o runner é admin): no notebook, num terminal comum. **Limite
+>   `.exe` vale. Tarefa na raiz do Agendador (`\Triage - Revisao semanal`): numa pasta `\Triage`, o desagendar deixava
+>   a pasta vazia para trás (visto no notebook).
+> - **No notebook (01/11), sem admin:** o Controle Inteligente liberou o `.exe` do CI (757ff1a); `corrigir
+>   temporarios` com "n" mostrou o plano e não apagou nada; com "s" liberou 310 MB em 18 arquivos (o maior, 285 MB,
+>   era um instalador baixado do Docker Desktop); `agendar` criou a tarefa como usuário comum (Interactive, Limited,
+>   ação certa, roda ao ligar) e `desagendar` tirou. Critério do SPEC cumprido. **Limite
 >   conhecido:** a janela do console aparece enquanto a revisão roda (~20 s); se incomodar, `conhost --headless`.
 > - **CI:** no runner (descartável) as três correções rodam de verdade, com a recusa como contraprova, e o
 >   agendar/desagendar passam pelo `schtasks`. Falta o critério do SPEC "primeiro uso real no notebook só nos

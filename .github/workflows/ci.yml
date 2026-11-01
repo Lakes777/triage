@@ -140,10 +140,10 @@ jobs:
           # Agendamento pelo schtasks, com o XML que os testes conferem
           & $exe agendar
           if ($LASTEXITCODE -ne 0) { throw "agendar saiu com $LASTEXITCODE" }
-          $xml = schtasks /Query /TN "\Triage\Revisao semanal" /XML | Out-String
+          $xml = schtasks /Query /TN "\Triage - Revisao semanal" /XML | Out-String
           if ($xml -notmatch 'revisar --sem-abrir' -or $xml -notmatch '<StartWhenAvailable>true') { throw "tarefa diferente do esperado: $xml" }
           & $exe desagendar
-          schtasks /Query /TN "\Triage\Revisao semanal" 2>$null
+          schtasks /Query /TN "\Triage - Revisao semanal" 2>$null
           if ($LASTEXITCODE -eq 0) { throw "a tarefa continuou depois do desagendar" }
           exit 0
       - uses: actions/upload-artifact@v5
