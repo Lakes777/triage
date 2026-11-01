@@ -271,6 +271,42 @@ README atualizado. Uma sessão nova por fase, começando por este arquivo.
 > - Problemas (crítico/atenção) vêm abertos; o resto fecha num `<details>` (abre no clique e no teclado, sem script).
 >   Visual provisório e neutro, com tema claro/escuro: a identidade própria fica para a fase 9.
 
+> 01/11/2026 (fase 5, decidido ao fazer):
+> - **Correções** em `Triage.Agente/Correcoes`: `temporarios` e `lixeira` (seguras, P26) e `cache-windows-update`
+>   (só admin, só item por item: para o serviço `wuauserv` e religa num `finally`, só se ele estava rodando). Cada
+>   uma planeja (o que faria, quanto) antes de perguntar; o `ExecutorDeCorrecoes` pergunta e só "s"/"sim" confirmam;
+>   Enter vazio, outra resposta ou entrada fechada cancelam. O duplo clique nunca corrige (teste).
+> - **Só arquivos criados E modificados há mais de 24 h** (decisão minha, não estava no SPEC): um instalador rodando
+>   agora usa o temporário que acabou de criar. A data de criação entrou pelo revisor: quem extrai um .zip mantém a
+>   data de modificação original (de anos atrás), e o `setup.exe` aberto de dentro do zip perderia as DLLs. No Linux o
+>   .NET não separa as duas datas: essa prova está no CI do Windows. Subpastas antigas que ficam vazias saem; a raiz
+>   nunca. O horário é lido uma vez por comando: o que a pergunta mostra é o que sai.
+> - **Travas:** links e junções nunca são seguidos nem apagados (contraprova: sem a trava, o teste apaga o arquivo
+>   de fora; no CI, uma junção de verdade no Temp); logo antes de apagar cada arquivo, as pastas entre ele e a raiz
+>   são conferidas de novo (alguém pode trocar uma subpasta por junção no meio); e a pasta precisa ter o nome esperado
+>   (`...\Temp`, `Windows\Temp`, `SoftwareDistribution\Download`), porque o Temp vem da variável TEMP, que qualquer
+>   programa pode trocar para a pasta do usuário. **Limite conhecido:** entre essa conferência e o apagar ainda há
+>   uma janela pequena; no `C:\Windows\Temp` (que aceita escrita de usuário comum) um programa malicioso no PC poderia
+>   usá-la para fazer o admin apagar um arquivo de mesmo nome em outra pasta. Fechar de vez = abrir com
+>   `FILE_FLAG_OPEN_REPARSE_POINT` e conferir com `GetFinalPathNameByHandle`; fica para depois (já exige um programa
+>   malicioso rodando no PC).
+> - **Windows Update:** o estado é lido antes; parar e limpar ficam dentro do `try`, e o `finally` religa se ele
+>   estava rodando (mesmo com timeout ao parar, achado do revisor). Em `StopPending` (parando sozinho) só espera.
+> - **Lixeira** entra nas seguras (P26), mas o plano diz "apagados para sempre": é a última chance de recuperar um
+>   arquivo. Esvazia por `SHEmptyRecycleBin` sem a janela do Explorer (a confirmação foi no terminal).
+> - **Registro** `correcoes.jsonl`: uma linha por decisão (aplicada, recusada, nada-a-fazer, erro), com bytes,
+>   apagados, pulados e versão; sem caminho (P15): erro vira só tipo e código (`IOException (0x80131620)`), e
+>   qualquer caminho que sobre num texto vira "(caminho)". Uma correção que falha (até ao planejar, como uma lixeira
+>   que não lê) não impede as outras.
+> - **Agendamento:** `schtasks /Create /XML` (o XML dá `StartWhenAvailable` e rodar na bateria, que a linha de
+>   comando não dá), toda segunda 12h, `InteractiveToken` + `LeastPrivilege` (sem senha guardada, sem admin),
+>   ação `triage.exe revisar --sem-abrir`. Recusa agendar pelo `dotnet run` (chamaria o dotnet.exe); outro nome de
+>   `.exe` vale. **Falta provar** agendar sem admin (o runner é admin): no notebook, num terminal comum. **Limite
+>   conhecido:** a janela do console aparece enquanto a revisão roda (~20 s); se incomodar, `conhost --headless`.
+> - **CI:** no runner (descartável) as três correções rodam de verdade, com a recusa como contraprova, e o
+>   agendar/desagendar passam pelo `schtasks`. Falta o critério do SPEC "primeiro uso real no notebook só nos
+>   temporários": depende do Controle Inteligente liberar o `.exe` (ou da SignPath).
+
 Boas para subagentes (em worktree):
 
 - **Fases 2 e 3:** cada verificação é uma classe sem dependência das outras, lendo só pela

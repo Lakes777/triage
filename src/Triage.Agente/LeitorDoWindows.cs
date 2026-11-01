@@ -176,7 +176,7 @@ public sealed partial class LeitorDoWindows(TimeProvider relogio) : ILeitorDoSis
         return Lido.Ok(new Pasta(bytes, arquivos));
     }
 
-    private static ConteudoDaLixeira LerLixeira()
+    internal static ConteudoDaLixeira LerLixeira()
     {
         var info = new InfoDaLixeira { Tamanho = Marshal.SizeOf<InfoDaLixeira>() };
         Marshal.ThrowExceptionForHR(SHQueryRecycleBinW(null, ref info));

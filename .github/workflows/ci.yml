@@ -72,6 +72,80 @@ jobs:
           Get-Content publicado\triage.exe.sha256
           # O GitHub encerra o passo com o último $LASTEXITCODE: sem isto, tirar o gravar daria o 2 de propósito lá de cima
           exit 0
+      - name: Correções e agendamento de verdade (o runner é descartável)
+        shell: pwsh
+        run: |
+          [Console]::OutputEncoding = [Text.Encoding]::UTF8
+          $exe = Resolve-Path .\publicado\triage.exe
+          $registro = "$env:LOCALAPPDATA\Triage\correcoes.jsonl"
+          function Ultima { (Get-Content $registro | Select-Object -Last 1 | ConvertFrom-Json) }
+          function Velho0($pasta, $nome) {
+            $arq = Join-Path $pasta $nome
+            Set-Content $arq ("x" * 4096)
+            (Get-Item $arq).LastWriteTime = (Get-Date).AddDays(-3)
+            $arq
+          }
+
+          function Velho($pasta, $nome) {
+            $arq = Velho0 $pasta $nome
+            (Get-Item $arq).CreationTime = (Get-Date).AddDays(-3)
+            $arq
+          }
+
+          # Contraprova: sem o "s", nada sai
+          $lixo = Velho $env:TEMP "triage-ci-lixo.tmp"
+          "n" | & $exe corrigir temporarios
+          if (-not (Test-Path $lixo)) { throw "apagou sem confirmação" }
+          if ((Ultima).decisao -ne "recusada") { throw "a recusa não foi registrada" }
+
+          # Arquivo recém-extraído de um .zip: criado agora, mas com a data de modificação de anos atrás
+          $doZip = Velho0 $env:TEMP "triage-ci-do-zip.dll"
+          # Contraprova da junção: uma junção no Temp apontando para fora, com um arquivo velho do outro lado
+          $fora = New-Item -ItemType Directory "$env:RUNNER_TEMP\triage-fora" -Force
+          $deFora = Velho $fora.FullName "importante.docx"
+          $null = New-Item -ItemType Junction -Path "$env:TEMP\triage-ci-juncao" -Target $fora.FullName
+
+          # Temporários (usuário e Windows: o runner é admin)
+          $doWindows = Velho "$env:WINDIR\Temp" "triage-ci-lixo.tmp"
+          "s" | & $exe corrigir temporarios
+          if ($LASTEXITCODE -ne 0) { throw "corrigir temporarios saiu com $LASTEXITCODE" }
+          if ((Test-Path $lixo) -or (Test-Path $doWindows)) { throw "os temporários antigos ficaram" }
+          if (-not (Test-Path $doZip)) { throw "apagou um arquivo criado agora (só a modificação era antiga)" }
+          if (-not (Test-Path $deFora)) { throw "seguiu a junção e apagou um arquivo fora do Temp" }
+          if ((Ultima).decisao -ne "aplicada") { throw "a limpeza não foi registrada" }
+
+          # Lixeira: manda um arquivo para lá e esvazia pelo SHEmptyRecycleBin
+          Add-Type -AssemblyName Microsoft.VisualBasic
+          $paraLixeira = Velho $env:TEMP "triage-ci-lixeira.txt"
+          [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($paraLixeira, 'OnlyErrorDialogs', 'SendToRecycleBin')
+          "s" | & $exe corrigir lixeira
+          if ($LASTEXITCODE -ne 0) { throw "corrigir lixeira saiu com $LASTEXITCODE" }
+          if ((Ultima).decisao -ne "aplicada" -or (Ultima).apagados -lt 1) { throw "a lixeira não foi esvaziada: $(Ultima)" }
+
+          # Cache do Windows Update: para o serviço, limpa e devolve o serviço como estava
+          # Começa com o serviço ligado, para provar também o religar
+          Start-Service wuauserv
+          $antes = (Get-Service wuauserv).Status
+          "wuauserv antes: $antes"
+          $cab = Velho "$env:WINDIR\SoftwareDistribution\Download" "triage-ci-lixo.tmp"
+          "s" | & $exe corrigir cache-windows-update
+          if ($LASTEXITCODE -ne 0) { throw "corrigir cache-windows-update saiu com $LASTEXITCODE" }
+          if (Test-Path $cab) { throw "o cache antigo ficou" }
+          if ((Ultima).decisao -ne "aplicada" -or (Ultima).apagados -lt 1) { throw "o cache não foi registrado: $(Ultima)" }
+          $depois = (Get-Service wuauserv).Status
+          "wuauserv depois: $depois"
+          if ($antes -eq 'Running' -and $depois -ne 'Running') { throw "o Windows Update ficou parado" }
+          Get-Content $registro
+
+          # Agendamento pelo schtasks, com o XML que os testes conferem
+          & $exe agendar
+          if ($LASTEXITCODE -ne 0) { throw "agendar saiu com $LASTEXITCODE" }
+          $xml = schtasks /Query /TN "\Triage\Revisao semanal" /XML | Out-String
+          if ($xml -notmatch 'revisar --sem-abrir' -or $xml -notmatch '<StartWhenAvailable>true') { throw "tarefa diferente do esperado: $xml" }
+          & $exe desagendar
+          schtasks /Query /TN "\Triage\Revisao semanal" 2>$null
+          if ($LASTEXITCODE -eq 0) { throw "a tarefa continuou depois do desagendar" }
+          exit 0
       - uses: actions/upload-artifact@v5
         with:
           name: triage-win-x64

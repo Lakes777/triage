@@ -6,7 +6,7 @@ public sealed class EspacoLivre : IVerificacao
     public string Titulo => "Espaço livre";
     public string OQueE => "Quanto sobra em cada unidade do PC.";
     public string PorQueImporta => "Com o disco quase cheio o Windows não consegue instalar atualizações, fica lento e programas começam a dar erro ao salvar.";
-    public string ComoResolver => "Limpe os temporários e a lixeira (o Triage faz isso com confirmação), apague ou mova arquivos grandes de Downloads e desinstale programas que não usa.";
+    public string ComoResolver => "Limpe os temporários e a lixeira com triage corrigir --seguras (mostra tudo e pergunta uma vez), apague ou mova arquivos grandes de Downloads e desinstale programas que não usa.";
 
     public Avaliacao Avaliar(FotoDoSistema foto, Limites limites)
     {

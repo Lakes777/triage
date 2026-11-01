@@ -28,5 +28,11 @@ static bool AbrirNoNavegador(string arquivo)
     }
 }
 
-return new Comandos(Console.In, Console.Out, Console.Error, LeitorDoSistema, pastaDoTriage, AbrirNoNavegador)
-    .Executar(args);
+var windows = new AcessoAoWindows(
+    LeitorDoSistema,
+    () => OperatingSystem.IsWindows() ? new AmbienteDoWindows(TimeProvider.System) : null,
+    () => OperatingSystem.IsWindows() ? new AgendadorDoWindows() : null,
+    AbrirNoNavegador,
+    Environment.ProcessPath,
+    TimeProvider.System);
+return new Comandos(Console.In, Console.Out, Console.Error, pastaDoTriage, windows).Executar(args);

@@ -7,14 +7,25 @@ using Triage.Verificacoes;
 namespace Triage.Agente;
 
 /// <summary>
-/// Entrada do terminal. Cada fase acrescenta o seu comando aqui (corrigir, inscrever...).
-/// <paramref name="leitorDoSistema"/> devolve nulo fora do Windows; <paramref name="pastaDoTriage"/> é onde mora
-/// o limites.json e os relatórios (%LOCALAPPDATA%\Triage no Windows). <paramref name="abrirNoNavegador"/> devolve
-/// falso quando não deu para abrir (fora do Windows, sem navegador padrão).
+/// Tudo o que o agente usa do Windows, trocado por falsos nos testes. As fábricas devolvem nulo fora do Windows.
+/// <see cref="AbrirNoNavegador"/> devolve falso quando não deu para abrir; <see cref="Executavel"/> é o caminho do
+/// triage.exe que a tarefa semanal vai chamar.
+/// </summary>
+public sealed record AcessoAoWindows(
+    Func<ILeitorDoSistema?> Leitor,
+    Func<IAmbienteDeCorrecao?> Correcoes,
+    Func<IAgendador?> Agendador,
+    Func<string, bool> AbrirNoNavegador,
+    string? Executavel,
+    TimeProvider Relogio);
+
+/// <summary>
+/// Entrada do terminal. Cada fase acrescenta o seu comando aqui (inscrever, enviar...).
+/// <paramref name="pastaDoTriage"/> é onde moram o limites.json, os relatórios e o registro das correções
+/// (%LOCALAPPDATA%\Triage no Windows).
 /// </summary>
 public sealed class Comandos(
-    TextReader entrada, TextWriter saida, TextWriter erros,
-    Func<ILeitorDoSistema?> leitorDoSistema, string pastaDoTriage, Func<string, bool> abrirNoNavegador)
+    TextReader entrada, TextWriter saida, TextWriter erros, string pastaDoTriage, AcessoAoWindows windows)
 {
     public const int Sucesso = 0;
     public const int Falha = 1;
@@ -29,6 +40,11 @@ public sealed class Comandos(
           triage revisar --leitura <arq>    revisa uma leitura gravada, em vez deste PC
           triage revisar --sem-abrir        gera o relatório sem abrir o navegador
           triage gravar <arq>               grava a leitura deste PC em JSON (só medidas, sem nomes)
+          triage corrigir                   lista as correções
+          triage corrigir <item>            faz uma correção (mostra o que vai fazer e pergunta antes)
+          triage corrigir --seguras         faz as correções seguras de uma vez (uma pergunta só)
+          triage agendar                    revisa toda segunda às 12h, pelo Agendador de Tarefas
+          triage desagendar                 tira a revisão semanal
           triage --versao                   mostra a versão
           triage --ajuda                    mostra esta ajuda
         """;
@@ -38,7 +54,7 @@ public sealed class Comandos(
         if (args is [])
         {
             // Duplo clique: sem esperar, a janela fecharia antes de dar para ler (P11), até se der erro
-            var codigo = Protegido(() => Revisar(leitorDoSistema(), abrir: true));
+            var codigo = Protegido(() => Revisar(windows.Leitor(), abrir: true));
             saida.WriteLine();
             saida.WriteLine("Aperte Enter para fechar.");
             entrada.ReadLine();
@@ -67,7 +83,15 @@ public sealed class Comandos(
             case ["revisar", .. var opcoes]:
                 return Revisar(opcoes);
             case ["gravar", var arquivo]:
-                return Gravar(leitorDoSistema(), arquivo);
+                return Gravar(windows.Leitor(), arquivo);
+            case ["corrigir"]:
+                return ListarCorrecoes();
+            case ["corrigir", var item]:
+                return Corrigir(item);
+            case ["agendar"]:
+                return Agendar();
+            case ["desagendar"]:
+                return Desagendar();
             case ["--versao"]:
                 saida.WriteLine($"triage {VersaoDoTriage.Atual}");
                 return Sucesso;
@@ -113,7 +137,7 @@ public sealed class Comandos(
             erros.WriteLine(Ajuda);
             return UsoErrado;
         }
-        return Revisar(leitura is null ? leitorDoSistema() : new LeitorGravado(leitura), abrir);
+        return Revisar(leitura is null ? windows.Leitor() : new LeitorGravado(leitura), abrir);
     }
 
     private int Revisar(ILeitorDoSistema? leitor, bool abrir)
@@ -136,7 +160,7 @@ public sealed class Comandos(
         var relatorio = GuardarRelatorio(revisao);
         saida.WriteLine();
         saida.WriteLine($"Relatório completo: {relatorio}");
-        if (abrir && !abrirNoNavegador(relatorio))
+        if (abrir && !windows.AbrirNoNavegador(relatorio))
             saida.WriteLine("Não deu para abrir o navegador: abra o arquivo acima.");
         return Sucesso;
     }
@@ -164,6 +188,68 @@ public sealed class Comandos(
             return SoNoWindows();
         File.WriteAllText(arquivo, Gravacao.ParaJson(leitor.Ler()));
         saida.WriteLine($"Leitura gravada em {arquivo} (só medidas: sem nome de usuário, de arquivo ou de pasta).");
+        return Sucesso;
+    }
+
+    private int ListarCorrecoes()
+    {
+        saida.WriteLine("Correções (cada uma mostra o que vai fazer e pergunta antes):");
+        foreach (var c in Correcoes.Todas)
+            saida.WriteLine($"  triage corrigir {c.Item,-22}{c.Titulo}{(c.Segura ? " (segura)" : "")}");
+        saida.WriteLine("  triage corrigir --seguras         as marcadas como seguras, com uma pergunta só");
+        return Sucesso;
+    }
+
+    private int Corrigir(string item)
+    {
+        var correcao = item == "--seguras" ? null : Correcoes.Achar(item);
+        if (item != "--seguras" && correcao is null)
+        {
+            erros.WriteLine($"Correção desconhecida: {item}");
+            erros.WriteLine($"Existem: {string.Join(", ", Correcoes.Todas.Select(c => c.Item))} e --seguras");
+            return UsoErrado;
+        }
+        if (windows.Correcoes() is not { } ambiente)
+        {
+            erros.WriteLine("Corrigir só funciona no Windows.");
+            return Falha;
+        }
+        var executor = new ExecutorDeCorrecoes(entrada, saida, erros, ambiente,
+            new RegistroDeCorrecoes(Path.Combine(pastaDoTriage, "correcoes.jsonl")));
+        return correcao is null ? executor.CorrigirSeguras() : executor.Corrigir(correcao);
+    }
+
+    private int Agendar()
+    {
+        if (windows.Agendador() is not { } agendador)
+            return SoNoWindows();
+        // Pelo "dotnet run" o processo é o dotnet.exe: a tarefa chamaria o programa errado. Outro nome vale
+        // ("triage (1).exe" de quem baixou duas vezes). Os dois separadores: os testes rodam no Linux
+        var nome = windows.Executavel?.Split('\\', '/')[^1];
+        if (windows.Executavel is not { } exe || nome is null
+            || !nome.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+            || nome.Equals("dotnet.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            erros.WriteLine("Para agendar, rode pelo triage.exe baixado (o agendamento chama este mesmo arquivo), " +
+                "não pelo dotnet run.");
+            return Falha;
+        }
+        var proxima = TarefaSemanal.ProximaVez(windows.Relogio.GetLocalNow().DateTime);
+        agendador.Criar(TarefaSemanal.Nome, TarefaSemanal.Xml(exe, proxima));
+        saida.WriteLine($"Agendado: revisão toda segunda às {TarefaSemanal.Hora:HH\\:mm}, a próxima em " +
+            $"{proxima.ToString("dd/MM/yyyy", Textos.Cultura)}. Se o PC estiver desligado, roda assim que ligar.");
+        saida.WriteLine($"Ela só revisa e guarda o relatório em {Path.Combine(pastaDoTriage, "relatorios")}: nunca corrige nada.");
+        saida.WriteLine($"Usa este arquivo: {exe}. Se mover o triage.exe, rode triage agendar de novo.");
+        return Sucesso;
+    }
+
+    private int Desagendar()
+    {
+        if (windows.Agendador() is not { } agendador)
+            return SoNoWindows();
+        saida.WriteLine(agendador.Apagar(TarefaSemanal.Nome)
+            ? "Revisão semanal removida do Agendador de Tarefas."
+            : "Não havia revisão semanal agendada.");
         return Sucesso;
     }
 

@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/Lakes777/triage/actions/workflows/ci.yml/badge.svg)](https://github.com/Lakes777/triage/actions/workflows/ci.yml)
 
-> Em construção: fase 4 de 10 (15 verificações e relatório HTML). O plano inteiro está em [docs/SPEC.md](docs/SPEC.md).
+> Em construção: fase 5 de 10 (15 verificações, relatório HTML e correções com confirmação). O plano inteiro está em [docs/SPEC.md](docs/SPEC.md).
 
 Um agente que roda no computador, confere o que costuma dar problema (disco gastando, espaço acabando,
 bateria cansada, atualizações paradas, telas azuis, Defender desligado...) e gera um relatório com o que é,
@@ -66,6 +66,28 @@ O relatório completo abre no navegador: um arquivo HTML só, sem internet, com 
 resolver cada item (os problemas primeiro). Ele **não executa nada**: não tem script nem endereço externo (um
 teste garante, e a página ainda pede ao navegador para bloquear os dois). As correções são feitas no terminal,
 com confirmação. Os 20 relatórios mais recentes ficam guardados; `triage revisar --sem-abrir` gera sem abrir.
+
+### Correções
+
+```
+> triage corrigir --seguras
+Correções seguras que serão feitas:
+  - Arquivos temporários: 412 MB em 63 arquivo(s) com mais de 24 h, nos temporários do usuário
+  - Lixeira: 223 MB em 14 item(ns), apagados para sempre (confira antes se não quer nada de volta)
+Confirma as 2 correções? Digite s e Enter para confirmar (qualquer outra coisa cancela): s
+Arquivos temporários: liberou 412 MB em 63 arquivo(s).
+Lixeira: liberou 223 MB em 14 item(ns).
+```
+
+Nada é apagado sem você digitar `s` (Enter vazio cancela, e um teste quebra se a pergunta sumir). Só saem
+arquivos criados e modificados há mais de 24 h (um instalador aberto agora não perde nada), só de dentro das pastas
+previstas, e links ou junções para outras pastas nunca são seguidos;
+arquivo em uso fica e é contado. `triage corrigir temporarios`, `lixeira` ou `cache-windows-update` (este como
+administrador: para o Windows Update durante a limpeza e religa depois) fazem uma de cada vez. Tudo fica anotado em
+`%LOCALAPPDATA%\Triage\correcoes.jsonl` (o que fez e quanto liberou, sem nome de arquivo).
+
+`triage agendar` põe uma revisão toda segunda às 12h no Agendador de Tarefas (roda ao ligar se o PC estava
+desligado); ela só revisa e guarda o relatório, nunca corrige. `triage desagendar` tira.
 
 As verificações nunca leem o Windows direto: recebem uma "foto" do sistema. No `.exe` a foto vem do Windows
 (WMI, `powercfg`, API da lixeira); nos testes, de leituras gravadas de PCs de verdade com `triage gravar`

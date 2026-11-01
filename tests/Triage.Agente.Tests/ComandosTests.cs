@@ -19,7 +19,31 @@ public sealed class ComandosTests : IDisposable
 
     private string PastaDosRelatorios => Path.Combine(pasta, "relatorios");
 
-    public void Dispose() => Directory.Delete(pasta, recursive: true);
+    private readonly AmbienteFalso pc = new();
+    private readonly AgendadorFalso agendador = new();
+    private string? executavel = @"C:\Ferramentas\triage.exe";
+    private static readonly FakeRelogio Domingo = new(new DateTimeOffset(2026, 11, 1, 15, 0, 0, TimeSpan.FromHours(-3)));
+
+    public void Dispose()
+    {
+        Directory.Delete(pasta, recursive: true);
+        pc.Dispose();
+    }
+
+    // Por padrão o "PC" é o notebook gravado; foraDoWindows faz todas as fábricas devolverem nulo
+    private AcessoAoWindows Windows(Func<ILeitorDoSistema?> leitor, bool foraDoWindows = false) => new(
+        () => foraDoWindows ? null : leitor(),
+        () => foraDoWindows ? null : pc,
+        () => foraDoWindows ? null : agendador,
+        Abrir,
+        executavel,
+        Domingo);
+
+    private sealed class FakeRelogio(DateTimeOffset agora) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => agora.ToUniversalTime();
+        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.CreateCustomTimeZone("BRT", agora.Offset, "BRT", "BRT");
+    }
 
     private sealed record Rodada(int Codigo, string Saida, string Erros);
 
@@ -28,8 +52,8 @@ public sealed class ComandosTests : IDisposable
     {
         var saida = new StringWriter();
         var erros = new StringWriter();
-        var comandos = new Comandos(new StringReader(entrada), saida, erros,
-            () => foraDoWindows ? null : new LeitorGravado(Notebook), pasta, Abrir);
+        var comandos = new Comandos(new StringReader(entrada), saida, erros, pasta,
+            Windows(() => new LeitorGravado(Notebook), foraDoWindows));
         return new Rodada(comandos.Executar(args), saida.ToString(), erros.ToString());
     }
 
@@ -78,7 +102,7 @@ public sealed class ComandosTests : IDisposable
     {
         var entrada = new StringReader("\n");
         var saida = new StringWriter();
-        var comandos = new Comandos(entrada, saida, new StringWriter(), () => new LeitorGravado(Notebook), pasta, Abrir);
+        var comandos = new Comandos(entrada, saida, new StringWriter(), pasta, Windows(() => new LeitorGravado(Notebook)));
 
         var codigo = comandos.Executar([]);
 
@@ -100,6 +124,8 @@ public sealed class ComandosTests : IDisposable
     [Theory]
     [InlineData("revisar")]
     [InlineData("gravar", "x.json")]
+    [InlineData("agendar")]
+    [InlineData("desagendar")]
     public void Ler_este_PC_fora_do_Windows_explica_e_falha(params string[] args)
     {
         var r = Rodar(args, foraDoWindows: true);
@@ -167,7 +193,7 @@ public sealed class ComandosTests : IDisposable
     {
         var saida = new StringWriter();
         var erros = new StringWriter();
-        var comandos = new Comandos(new StringReader("\n"), saida, erros, () => new LeitorQuebrado(), pasta, Abrir);
+        var comandos = new Comandos(new StringReader("\n"), saida, erros, pasta, Windows(() => new LeitorQuebrado()));
 
         var codigo = comandos.Executar([]);
 
@@ -301,6 +327,125 @@ public sealed class ComandosTests : IDisposable
         Assert.False(File.Exists(antigos[1]));
         Assert.True(File.Exists(antigos[2]));
         Assert.True(File.Exists(atual));
+    }
+
+    [Fact]
+    public void Corrigir_sem_item_lista_as_correcoes()
+    {
+        var r = Rodar(["corrigir"]);
+
+        Assert.Equal(Comandos.Sucesso, r.Codigo);
+        Assert.Contains("triage corrigir temporarios", r.Saida);
+        Assert.Contains("(segura)", r.Saida);
+        Assert.Contains("--seguras", r.Saida);
+    }
+
+    [Fact]
+    public void Corrigir_um_item_pergunta_e_anota_na_pasta_do_triage()
+    {
+        var lixo = pc.Arquivo(pc.TempDoUsuario, "lixo.tmp");
+
+        var r = Rodar(["corrigir", "temporarios"], entrada: "s\n");
+
+        Assert.Equal(Comandos.Sucesso, r.Codigo);
+        Assert.False(File.Exists(lixo));
+        Assert.Contains("\"item\":\"temporarios\"", File.ReadAllText(Path.Combine(pasta, "correcoes.jsonl")));
+    }
+
+    [Fact]
+    public void Corrigir_seguras_pelo_comando()
+    {
+        pc.Lixeira = new ConteudoDaLixeira(10, 1);
+
+        var r = Rodar(["corrigir", "--seguras"], entrada: "s\n");
+
+        Assert.Equal(Comandos.Sucesso, r.Codigo);
+        Assert.Equal(["esvaziar lixeira"], pc.Chamadas);
+    }
+
+    [Fact]
+    public void Corrigir_item_desconhecido_e_erro_de_uso_sem_tocar_em_nada()
+    {
+        var r = Rodar(["corrigir", "registro-do-windows"]);
+
+        Assert.Equal(Comandos.UsoErrado, r.Codigo);
+        Assert.Contains("Correção desconhecida: registro-do-windows", r.Erros);
+        Assert.Empty(pc.Chamadas);
+    }
+
+    [Fact]
+    public void Corrigir_fora_do_Windows_explica()
+    {
+        var r = Rodar(["corrigir", "lixeira"], foraDoWindows: true);
+
+        Assert.Equal(Comandos.Falha, r.Codigo);
+        Assert.Contains("Corrigir só funciona no Windows.", r.Erros);
+    }
+
+    [Fact]
+    public void Duplo_clique_nunca_corrige()
+    {
+        // O Enter do duplo clique fecha a janela; ele nunca pode virar a confirmação de uma correção
+        var lixo = pc.Arquivo(pc.TempDoUsuario, "lixo.tmp");
+        pc.Lixeira = new ConteudoDaLixeira(10, 1);
+
+        Rodar([], entrada: "s\ns\n");
+
+        Assert.True(File.Exists(lixo));
+        Assert.Empty(pc.Chamadas);
+    }
+
+    [Fact]
+    public void Agendar_cria_a_tarefa_semanal_com_este_exe()
+    {
+        var r = Rodar(["agendar"]);
+
+        Assert.Equal(Comandos.Sucesso, r.Codigo);
+        var xml = Assert.Single(agendador.Tarefas, t => t.Key == TarefaSemanal.Nome).Value;
+        Assert.Contains("<Command>C:\\Ferramentas\\triage.exe</Command>", xml);
+        Assert.Contains("<Arguments>revisar --sem-abrir</Arguments>", xml);
+        Assert.Contains("<StartBoundary>2026-11-02T12:00:00</StartBoundary>", xml); // domingo 15h -> segunda
+        Assert.Contains("a próxima em 02/11/2026", r.Saida);
+        Assert.Contains("nunca corrige nada", r.Saida);
+    }
+
+    [Fact]
+    public void Agendar_aceita_o_exe_com_outro_nome()
+    {
+        executavel = @"C:\Users\ana\Downloads\triage (1).exe";
+
+        var r = Rodar(["agendar"]);
+
+        Assert.Equal(Comandos.Sucesso, r.Codigo);
+        Assert.Contains("triage (1).exe</Command>", agendador.Tarefas[TarefaSemanal.Nome]);
+    }
+
+    [Theory]
+    [InlineData(@"C:\Program Files\dotnet\dotnet.exe")]
+    [InlineData("/usr/bin/dotnet")]
+    [InlineData(null)]
+    public void Agendar_pelo_dotnet_run_e_recusado(string? processo)
+    {
+        executavel = processo;
+
+        var r = Rodar(["agendar"]);
+
+        Assert.Equal(Comandos.Falha, r.Codigo);
+        Assert.Contains("rode pelo triage.exe", r.Erros);
+        Assert.Empty(agendador.Tarefas);
+    }
+
+    [Fact]
+    public void Desagendar_tira_a_tarefa_e_avisa_quando_nao_havia()
+    {
+        Rodar(["agendar"]);
+
+        var primeira = Rodar(["desagendar"]);
+        var segunda = Rodar(["desagendar"]);
+
+        Assert.Empty(agendador.Tarefas);
+        Assert.Contains("removida", primeira.Saida);
+        Assert.Contains("Não havia", segunda.Saida);
     }
 
     private sealed class LeitorQuebrado : ILeitorDoSistema
