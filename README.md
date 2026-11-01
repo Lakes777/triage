@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/Lakes777/triage/actions/workflows/ci.yml/badge.svg)](https://github.com/Lakes777/triage/actions/workflows/ci.yml)
 
-> Em construção: fase 7 de 10 (agente completo, com envio opcional ao servidor; servidor recebendo revisões). O plano inteiro está em [docs/SPEC.md](docs/SPEC.md).
+> Em construção: fase 8 de 10 (agente completo; servidor com histórico, avisos de piora no Telegram e frota de demonstração). O plano inteiro está em [docs/SPEC.md](docs/SPEC.md).
 
 Um agente que roda no computador, confere o que costuma dar problema (disco gastando, espaço acabando,
 bateria cansada, atualizações paradas, telas azuis, Defender desligado...) e gera um relatório com o que é,
@@ -118,6 +118,7 @@ docker compose up -d                          # Postgres do servidor (porta 5437
 dotnet run --project src/Triage.Servidor      # /saude na 8080, gRPC (HTTP/2) na 8081
 dotnet run --project src/Triage.Servidor -- gerar-codigo   # código de inscrição (uso único, 24 h)
 dotnet run --project src/Triage.Servidor -- maquinas       # máquinas inscritas; revogar <id> corta uma
+dotnet run --project src/Triage.Servidor -- semear-demo    # repõe a frota inventada (só máquinas demo)
 
 # o .exe do Windows, um arquivo só, com o .NET dentro (o PC não precisa ter o .NET)
 dotnet publish src/Triage.Agente -c Release -r win-x64 -o publicado

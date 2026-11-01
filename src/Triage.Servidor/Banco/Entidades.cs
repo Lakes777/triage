@@ -49,3 +49,23 @@ public sealed class ResultadoGravado
     public required string Gravidade { get; init; }
     public string? Motivo { get; init; }
 }
+
+/// <summary>
+/// Uma piora a avisar no Telegram (P19). Nasce na mesma transação da revisão, uma por (máquina, revisão, item):
+/// repetir o envio não repete o aviso. EnviadoEm é marcado por um UPDATE condicional antes de mandar.
+/// </summary>
+public sealed class Aviso
+{
+    public Guid Id { get; init; }
+    public Guid MaquinaId { get; init; }
+    public Guid RevisaoId { get; init; }
+    public required string Item { get; init; }
+    public required string De { get; init; }
+    public required string Para { get; init; }
+
+    /// <summary>Texto extra (o modelo do disco no desgaste do SSD).</summary>
+    public string? Detalhe { get; init; }
+    public DateTimeOffset CriadoEm { get; init; }
+    public DateTimeOffset? EnviadoEm { get; set; }
+    public int Tentativas { get; set; }
+}

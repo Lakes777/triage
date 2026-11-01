@@ -22,6 +22,68 @@ namespace Triage.Servidor.Banco.Migracoes
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Triage.Servidor.Banco.Aviso", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CriadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em");
+
+                    b.Property<string>("De")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("de");
+
+                    b.Property<string>("Detalhe")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("detalhe");
+
+                    b.Property<DateTimeOffset?>("EnviadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enviado_em");
+
+                    b.Property<string>("Item")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("item");
+
+                    b.Property<Guid>("MaquinaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("maquina_id");
+
+                    b.Property<string>("Para")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("para");
+
+                    b.Property<Guid>("RevisaoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revisao_id");
+
+                    b.Property<int>("Tentativas")
+                        .HasColumnType("integer")
+                        .HasColumnName("tentativas");
+
+                    b.HasKey("Id")
+                        .HasName("pk_avisos");
+
+                    b.HasIndex("EnviadoEm")
+                        .HasDatabaseName("ix_avisos_enviado_em");
+
+                    b.HasIndex("MaquinaId", "RevisaoId", "Item")
+                        .IsUnique()
+                        .HasDatabaseName("ix_avisos_maquina_id_revisao_id_item");
+
+                    b.ToTable("avisos", (string)null);
+                });
+
             modelBuilder.Entity("Triage.Servidor.Banco.CodigoDeInscricao", b =>
                 {
                     b.Property<Guid>("Id")
@@ -180,6 +242,16 @@ namespace Triage.Servidor.Banco.Migracoes
                         .HasDatabaseName("ix_revisoes_maquina_id_feita_em");
 
                     b.ToTable("revisoes", (string)null);
+                });
+
+            modelBuilder.Entity("Triage.Servidor.Banco.Aviso", b =>
+                {
+                    b.HasOne("Triage.Servidor.Banco.RevisaoGravada", null)
+                        .WithMany()
+                        .HasForeignKey("MaquinaId", "RevisaoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_avisos_revisoes_maquina_id_revisao_id");
                 });
 
             modelBuilder.Entity("Triage.Servidor.Banco.CodigoDeInscricao", b =>

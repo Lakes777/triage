@@ -11,7 +11,7 @@ public sealed class AdministradorTests(ServidorDeTeste servidor)
         var saida = new StringWriter();
         var erros = new StringWriter();
         await using var escopo = servidor.Services.CreateAsyncScope();
-        var codigo = await comando(escopo.ServiceProvider.GetRequiredService<Inscricoes>(), saida, erros);
+        var codigo = await comando(escopo.ServiceProvider, saida, erros);
         return (codigo, saida.ToString(), erros.ToString());
     }
 

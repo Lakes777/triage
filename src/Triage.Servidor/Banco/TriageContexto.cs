@@ -9,6 +9,7 @@ public sealed class TriageContexto(DbContextOptions<TriageContexto> opcoes) : Db
     public DbSet<CodigoDeInscricao> Codigos => Set<CodigoDeInscricao>();
     public DbSet<RevisaoGravada> Revisoes => Set<RevisaoGravada>();
     public DbSet<ResultadoGravado> Resultados => Set<ResultadoGravado>();
+    public DbSet<Aviso> Avisos => Set<Aviso>();
 
     protected override void OnModelCreating(ModelBuilder modelo)
     {
@@ -48,6 +49,21 @@ public sealed class TriageContexto(DbContextOptions<TriageContexto> opcoes) : Db
             r.Property(x => x.Gravidade).HasMaxLength(16);
             r.Property(x => x.Motivo).HasMaxLength(16);
             r.HasOne<RevisaoGravada>().WithMany().HasForeignKey(x => new { x.MaquinaId, x.RevisaoId });
+        });
+
+        modelo.Entity<Aviso>(a =>
+        {
+            a.ToTable("avisos");
+            a.Property(x => x.Id).ValueGeneratedNever();
+            a.Property(x => x.Item).HasMaxLength(64);
+            a.Property(x => x.De).HasMaxLength(16);
+            a.Property(x => x.Para).HasMaxLength(16);
+            a.Property(x => x.Detalhe).HasMaxLength(200);
+            // Uma piora por item em cada revisão: o envio repetido nunca cria outra (P17 (5))
+            a.HasIndex(x => new { x.MaquinaId, x.RevisaoId, x.Item }).IsUnique();
+            // O enviador procura os pendentes
+            a.HasIndex(x => x.EnviadoEm);
+            a.HasOne<RevisaoGravada>().WithMany().HasForeignKey(x => new { x.MaquinaId, x.RevisaoId });
         });
     }
 }

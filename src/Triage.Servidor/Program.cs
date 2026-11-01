@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Triage.Servidor;
+using Triage.Servidor.Avisos;
 using Triage.Servidor.Banco;
 
 // "gerar-codigo", "maquinas", "revogar <id>": comandos do administrador em vez de subir o servidor
@@ -28,9 +29,28 @@ var limites = LimitesDoServidor.Ler(builder.Configuration);
 builder.Services.AddSingleton(limites);
 limites.Registrar(builder.Services);
 
+// Avisos pelo Telegram (P19): com token e chat válidos, a rodada manda; sem eles, os avisos só ficam no banco
+var token = builder.Configuration["Telegram:Token"];
+var chat = builder.Configuration["Telegram:Chat"];
+var telegramLigado = MensageiroDoTelegram.TokenValido(token) && !string.IsNullOrWhiteSpace(chat);
+if (telegramLigado)
+{
+    builder.Services.AddScoped<EnviadorDeAvisos>();
+    // Sem os loggers do HttpClient: eles escrevem a URL de cada pedido, e a URL do Telegram leva o token
+    builder.Services.AddHttpClient("telegram", http => http.Timeout = TimeSpan.FromSeconds(10)).RemoveAllLoggers();
+    builder.Services.AddScoped<IMensageiro>(s => new MensageiroDoTelegram(
+        s.GetRequiredService<IHttpClientFactory>().CreateClient("telegram"), token!, chat!));
+    builder.Services.AddHostedService<RodadaDeAvisos>();
+}
+
 builder.Services.AddHealthChecks().AddDbContextCheck<TriageContexto>("banco");
 
 var app = builder.Build();
+
+// Configurou pela metade (token com aspas vindas do .env, chat faltando): avisa sem mostrar o valor
+if (!telegramLigado && (!string.IsNullOrWhiteSpace(token) || !string.IsNullOrWhiteSpace(chat)))
+    app.Logger.LogWarning("Telegram configurado pela metade ou com token fora do formato do BotFather: os avisos " +
+        "ficam só no banco");
 
 // As migrações do EF rodam ao subir (e antes de qualquer comando): o banco nunca fica atrás do código
 using (var escopo = app.Services.CreateScope())
@@ -39,7 +59,7 @@ using (var escopo = app.Services.CreateScope())
 if (comando is not null)
 {
     using var escopo = app.Services.CreateScope();
-    return await comando(escopo.ServiceProvider.GetRequiredService<Inscricoes>(), Console.Out, Console.Error);
+    return await comando(escopo.ServiceProvider, Console.Out, Console.Error);
 }
 
 app.UseRateLimiter();

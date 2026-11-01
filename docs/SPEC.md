@@ -376,6 +376,43 @@ README atualizado. Uma sessão nova por fase, começando por este arquivo.
 >   servidor aceitou o código mas a chave não gravou: a mensagem diz que o código foi gasto e qual máquina revogar;
 >   (7) `--servidor` sem valor virava parte do apelido.
 
+> 01/11/2026 (fase 8, decidido ao fazer):
+> - **Pioras** (`Historico`, puro): ok -> atenção, atenção -> crítico, ok -> crítico. O "antes" de cada item é a última
+>   gravidade comparável (ok/atenção/crítico) nos 180 dias antes desta revisão: um pulado no meio não apaga a
+>   história. Melhora, pulado e "não se aplica" não avisam. Revisão com `feita_em` mais velho que a última gravada
+>   (fila fora de ordem) não avisa (contraprova feita).
+> - **Desgaste do SSD subindo rápido (regra que estava em aberto):** **3 pontos ou mais entre uma revisão e a
+>   seguinte**, no mesmo disco (mesmo modelo e tamanho; não há número de série, P15). Um SSD comum gasta perto de 1
+>   ponto por ano. Vira o item `desgaste-ssd` com o modelo no detalhe.
+> - **Avisos** nascem na mesma transação da revisão (tabela `avisos`, única por máquina + revisão + item): o envio
+>   repetido não grava de novo, então não avisa de novo. A trava da máquina no envio passou de `FOR SHARE` para
+>   `FOR NO KEY UPDATE`: dois envios da mesma máquina vão um de cada vez e cada um compara com o anterior já gravado
+>   (a revogação continua esperando, com a mesma contraprova).
+> - **Telegram** (padrão do Vigil, bot do Sidekick): `Telegram:Token` (formato do BotFather) e `Telegram:Chat`; sem
+>   eles a rodada nem liga e os avisos ficam no banco. Rodada a cada 30 s: cada aviso é pego por `UPDATE ... WHERE
+>   enviado_em IS NULL` (duas rodadas juntas mandam uma vez: teste com barreira + contraprova determinística); falha
+>   desfaz a marca e conta a tentativa; aviso com mais de 7 dias não vai; máquina demo nunca vai. Texto com apelido,
+>   item, de -> para, hora de Brasília e link `Painel:Endereco/maquinas/<id>` (o painel é a fase 9).
+> - **Demonstração:** `semear-demo` apaga e recria só as máquinas `demo = true` (6 PCs, ids fixos, 8 semanas, cada
+>   um com um problema), com as gravidades calculadas pelo `Motor` de verdade e o histórico de avisos pelas mesmas
+>   regras. O critério "semear recusa banco sem `demo`" vem de quando a demo teria banco próprio; com a P31 (mesmo
+>   banco) virou "nunca toca numa máquina real", com contraprova (uma real com revisão continua igual). O cron
+>   diário fica para a fase 10.
+> - **Revisor (corrigido):** (1) **o token do bot ia para o log**: o HttpClient escreve a URL de cada pedido, e a do
+>   Telegram leva o token; o cliente "telegram" agora é registrado com `RemoveAllLoggers()` (teste com captador de
+>   log + contraprova); (2) desligar o servidor no meio do envio deixava o aviso marcado sem ter saído: o envio não
+>   usa mais o cancelamento (o prazo de 10 s é menor que a espera do desligamento) e a rodada para entre avisos;
+>   (3) o desgaste do SSD só é lido com admin e a semanal roda sem: agora compara com a última revisão **de admin**
+>   de até 30 dias; (4) a demo semeada antes do meio-dia criava revisão no futuro; (5) duas semeaduras juntas
+>   quebravam (ids fixos): `pg_advisory_xact_lock`; (6) fuso de Brasília com fallback fixo em -03:00 se a imagem não
+>   tiver tzdata; (7) Telegram configurado pela metade avisa no log (sem o valor), o erro traz o corpo da resposta
+>   ("chat not found") e a rodada para na primeira falha; (8) mesmo `feita_em` em duas revisões avisa uma vez, e o
+>   "antes" por item sai do banco já reduzido (ROW_NUMBER) em vez de trazer 180 dias de resultados.
+> - **Riscos aceitos (como no Vigil):** processo morto entre marcar e mandar perde o aviso; Telegram que recebeu mas
+>   estourou o prazo manda duas vezes.
+> - **Para a fase 10:** imagem Docker com **ICU e tzdata** (`aspnet:10.0` padrão ou chiseled-extra, não alpine):
+>   o `Textos.Cultura` (pt-BR) das verificações precisa do ICU, e o `semear-demo` e os avisos usam as verificações.
+
 Boas para subagentes (em worktree):
 
 - **Fases 2 e 3:** cada verificação é uma classe sem dependência das outras, lendo só pela

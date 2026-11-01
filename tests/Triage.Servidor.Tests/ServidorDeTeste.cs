@@ -30,8 +30,9 @@ public sealed class ServidorDeTeste : WebApplicationFactory<Program>, IAsyncLife
         // Ambiente próprio: sem ele, o servidor leria o appsettings.Development.json (o banco do dia a dia)
         builder.UseEnvironment("Testes");
         builder.UseSetting("ConnectionStrings:Banco", banco.GetConnectionString());
-        // Os testes fazem muitas inscrições seguidas; o limite em si é testado com outro valor
+        // Os testes fazem muitas inscrições e envios seguidos; os limites em si são testados com outro valor
         builder.UseSetting("Limites:InscricoesPorMinuto", "100000");
+        builder.UseSetting("Limites:EnviosPorMinuto", "100000");
     }
 
     /// <summary>Outro servidor no mesmo banco, com um ajuste (limite menor, gancho de teste...).</summary>

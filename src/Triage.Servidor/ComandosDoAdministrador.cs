@@ -1,3 +1,6 @@
+using Triage.Servidor.Banco;
+using Triage.Servidor.Demo;
+
 namespace Triage.Servidor;
 
 /// <summary>
@@ -12,17 +15,28 @@ public static class ComandosDoAdministrador
           gerar-codigo          código de inscrição de uso único, vale 24 h
           maquinas              lista as máquinas inscritas
           revogar <maquina-id>  corta a chave da máquina (ela para de conseguir enviar)
+          semear-demo           repõe a frota inventada da demonstração (só mexe em máquinas demo)
         """;
 
     /// <summary>Nulo = não é comando, sobe o servidor. Senão, a ação a rodar (ou o uso, se veio errado).</summary>
-    public static Func<Inscricoes, TextWriter, TextWriter, Task<int>>? Interpretar(string[] args) => args switch
+    public static Func<IServiceProvider, TextWriter, TextWriter, Task<int>>? Interpretar(string[] args) => args switch
     {
-        ["gerar-codigo"] => GerarCodigo,
-        ["maquinas"] => Listar,
-        ["revogar", var id] => (i, s, e) => Revogar(i, s, e, id),
-        ["gerar-codigo" or "maquinas" or "revogar", ..] => (_, _, e) => UsoErrado(e),
+        ["gerar-codigo"] => (p, s, e) => GerarCodigo(p.GetRequiredService<Inscricoes>(), s, e),
+        ["maquinas"] => (p, s, e) => Listar(p.GetRequiredService<Inscricoes>(), s, e),
+        ["revogar", var id] => (p, s, e) => Revogar(p.GetRequiredService<Inscricoes>(), s, e, id),
+        ["semear-demo"] => SemearDemo,
+        ["gerar-codigo" or "maquinas" or "revogar" or "semear-demo", ..] => (_, _, e) => UsoErrado(e),
         _ => null,
     };
+
+    private static async Task<int> SemearDemo(IServiceProvider servicos, TextWriter saida, TextWriter erros)
+    {
+        var revisoes = await FrotaDeDemonstracao.Semear(servicos.GetRequiredService<TriageContexto>(),
+            servicos.GetRequiredService<TimeProvider>().GetUtcNow());
+        saida.WriteLine($"Frota da demonstração reposta: {FrotaDeDemonstracao.Ids.Count} máquinas, {revisoes} revisões. " +
+            "As máquinas reais não foram tocadas.");
+        return 0;
+    }
 
     private static async Task<int> GerarCodigo(Inscricoes inscricoes, TextWriter saida, TextWriter erros)
     {

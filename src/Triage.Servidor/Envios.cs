@@ -30,6 +30,9 @@ public sealed class EnvioRecusado(RecusaDoEnvio motivo, string mensagem) : Excep
 public class PontosDeTeste
 {
     public virtual Task DepoisDeConferirAMaquina() => Task.CompletedTask;
+
+    /// <summary>Entre listar os avisos pendentes e marcar cada um: o teste junta duas rodadas aqui.</summary>
+    public virtual Task DepoisDeListarAvisos() => Task.CompletedTask;
 }
 
 /// <summary>Recebe e grava revisões (P17, P25).</summary>
@@ -48,8 +51,9 @@ public sealed partial class Envios(TriageContexto banco, TimeProvider relogio, P
 
     /// <summary>
     /// Grava a revisão e diz se gravou agora (falso = a mesma revisão já estava lá). A máquina é lida com
-    /// FOR SHARE: a revogação (UPDATE) espera este envio terminar, e um envio que chega depois da revogação já vê
-    /// revogada_em. Então a revisão grava antes da revogação ou é recusada, nunca depois (P17).
+    /// FOR NO KEY UPDATE: a revogação (UPDATE) espera este envio terminar, e um envio que chega depois da revogação
+    /// já vê revogada_em. Então a revisão grava antes da revogação ou é recusada, nunca depois (P17). A mesma trava
+    /// põe em fila dois envios da mesma máquina: cada um compara com o anterior já gravado (avisos da fase 8).
     /// </summary>
     public async Task<bool> Gravar(string? maquinaTexto, string? chave, EnviarRevisaoPedido pedido,
         CancellationToken cancelar = default)
@@ -61,7 +65,7 @@ public sealed partial class Envios(TriageContexto banco, TimeProvider relogio, P
 
         await using var transacao = await banco.Database.BeginTransactionAsync(cancelar);
         var maquina = (await banco.Maquinas
-            .FromSqlInterpolated($"SELECT * FROM maquinas WHERE id = {maquinaId} FOR SHARE")
+            .FromSqlInterpolated($"SELECT * FROM maquinas WHERE id = {maquinaId} FOR NO KEY UPDATE")
             .AsNoTracking()
             .ToListAsync(cancelar)).SingleOrDefault();
         var chaveConfere = Regras.MesmaChave(chave, maquina?.ChaveHash ?? HashQualquer);
@@ -123,8 +127,61 @@ public sealed partial class Envios(TriageContexto banco, TimeProvider relogio, P
             Motivo = r.Gravidade == Gravidade.Pulado ? Nome(r.Motivo) : null,
         }));
         await banco.SaveChangesAsync(cancelar);
+        await GerarAvisos(maquinaId, revisaoId, pedido, agora, cancelar);
         await transacao.CommitAsync(cancelar);
         return true;
+    }
+
+    /// <summary>
+    /// As pioras desta revisão em relação ao que veio antes (P19), na mesma transação: ou a revisão entra com os
+    /// avisos, ou nada entra. Uma revisão mais velha que a última já gravada (a fila offline entregando fora de
+    /// ordem) não avisa: a comparação é por feita_em, não pela hora em que chegou.
+    /// </summary>
+    private async Task GerarAvisos(Guid maquinaId, Guid revisaoId, EnviarRevisaoPedido pedido, DateTimeOffset agora,
+        CancellationToken cancelar)
+    {
+        var feita = pedido.FeitaEm.ToDateTimeOffset();
+        // ">=" e outro id: duas revisões com o mesmo feita_em geram os avisos uma vez (a primeira que chegou)
+        if (await banco.Revisoes.AnyAsync(r => r.MaquinaId == maquinaId && r.FeitaEm >= feita && r.Id != revisaoId, cancelar))
+            return;
+
+        // Meio ano de história basta: um item que ficou pulado mais que isso começa do zero
+        var desde = feita.AddDays(-180);
+        // Só a última de cada item, no próprio banco (ROW_NUMBER): uma máquina com muitas revisões não traz tudo
+        var anterior = await (
+                from r in banco.Resultados
+                join v in banco.Revisoes on new { r.MaquinaId, Revisao = r.RevisaoId } equals new { v.MaquinaId, Revisao = v.Id }
+                where r.MaquinaId == maquinaId && v.FeitaEm < feita && v.FeitaEm >= desde
+                      && (r.Gravidade == "ok" || r.Gravidade == "atencao" || r.Gravidade == "critico")
+                select new { r.Item, r.Gravidade, v.FeitaEm })
+            .GroupBy(x => x.Item)
+            .Select(g => g.OrderByDescending(x => x.FeitaEm).First())
+            .ToDictionaryAsync(x => x.Item, x => x.Gravidade, cancelar);
+        var atual = pedido.Resultados.ToDictionary(r => r.Item, r => Nome(r.Gravidade));
+        // O desgaste só é lido com admin, e a revisão semanal roda sem: compara com a última revisão de admin, de até
+        // 30 dias atrás (mais que isso, 3 pontos já não é "rápido")
+        var fotoAnterior = pedido.Administrador
+            ? await banco.Revisoes.AsNoTracking()
+                .Where(r => r.MaquinaId == maquinaId && r.Administrador && r.FeitaEm < feita && r.FeitaEm >= feita.AddDays(-30))
+                .OrderByDescending(r => r.FeitaEm).Select(r => r.Foto).FirstOrDefaultAsync(cancelar)
+            : null;
+
+        var pioras = Historico.Pioras(anterior, atual)
+            .Concat(Historico.DesgasteSubindo(fotoAnterior, pedido.FotoJson))
+            // Dois discos subindo na mesma revisão viram um aviso só (o índice é por item)
+            .DistinctBy(p => p.Item);
+        banco.Avisos.AddRange(pioras.Select(p => new Aviso
+        {
+            Id = Guid.CreateVersion7(),
+            MaquinaId = maquinaId,
+            RevisaoId = revisaoId,
+            Item = p.Item,
+            De = p.De,
+            Para = p.Para,
+            Detalhe = p.Detalhe,
+            CriadoEm = agora,
+        }));
+        await banco.SaveChangesAsync(cancelar);
     }
 
     private Guid Validar(EnviarRevisaoPedido pedido)
